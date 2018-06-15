@@ -1,0 +1,13 @@
+Package: pubPriCmp
+Title: Compare Public Private Sector Energy Behavior Under Extreme Weather
+Version: 0.0.0.9000
+Authors@R: person("Yujie", "Xu", email = "first.last@example.com", role = c("aut", "cre"))
+Description: This package is used to create data files used in the analysis of electricity and gas energy consumption increase under extreme weather conditions, for two public and private portfolios.
+Depends: R (>= 3.4.3)
+License: What license is it under?
+Encoding: UTF-8
+LazyData: true
+Imports:
+  dplyr,
+  readr
+RoxygenNote: 6.0.1.9000
