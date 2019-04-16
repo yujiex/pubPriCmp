@@ -1,5 +1,5 @@
 image/
-.csv
-.feather
-.rda
-.DS_Store
+*.csv
+*.feather
+*.rda
+*.DS_Store
