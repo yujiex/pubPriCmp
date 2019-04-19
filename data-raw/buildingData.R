@@ -130,11 +130,22 @@ pnc_energy = pnc_electric %>>%
 ##   dplyr::filter(n() > 1) %>>%
 ##   head()
 
+## pnc_static =
+##   readr::read_csv("~/Dropbox/thesis/writeups/policy_cmp/tables/pnc_static.csv") %>>%
+##   as.data.frame() %>>%
+##   dplyr::rename(`State`=`state`,
+##                 `City`=`city`) %>>%
+##   {.}
+
+## changed source of static from pnc_static.csv to pnc_building_meta_data_from_pi_system.csv
 pnc_static =
-  readr::read_csv("~/Dropbox/thesis/writeups/policy_cmp/tables/pnc_static.csv") %>>%
-  as.data.frame() %>>%
-  dplyr::rename(`State`=`state`,
-                `City`=`city`) %>>%
+  readr::read_csv("pnc_building_meta_data_from_pi_system.csv") %>%
+  dplyr::select(Name, starts_with("|")) %>%
+  dplyr::rename_all(funs(gsub("\\|", "", .))) %>%
+  dplyr::rename(`latitude`=`Latitude`, `longitude`=`Longitude`,
+                `type_general`=`Building Class`,
+                `type_detail`=`Building Use`,
+                ) %>%
   {.}
 
 pnc_area = pnc_static %>%
@@ -145,7 +156,8 @@ pnc_area = pnc_static %>%
 
 sum(pnc_area$GSF)
 
-pnc_building = pnc_energy %>>%
+pnc_building =
+  pnc_energy %>>%
   dplyr::left_join(pnc_static, by="Name") %>>%
   dplyr::mutate(`Organization`="PNC",
                 `year`=as.numeric(`year`),
@@ -234,7 +246,7 @@ buildingLatlng %>%
   ## restrict to continental US
   dplyr::filter(!State %in% c("AK", "HI", "VI", "GU", "PR", "VI")) %>%
   ## restrict to states completely east of 100th meridian
-  dplyr::filter(!State %in% c("AK", "HI", "VI", "GU", "PR", "VI")) %>%
+  dplyr::filter(!State %in% c("ND", "SD", "NE", "KS", "OK", "TX")) %>%
   leaflet() %>%
   addTiles() %>%
   addCircles(lat=~latitude, lng=~longitude, color=~ pal(private),
@@ -243,21 +255,27 @@ buildingLatlng %>%
 
 ## apply the same spacial filter
 buildingData <-
-
   buildingData %>%
-  ## dplyr::filter(`longitude` > -91.15) %>%
+  ## restrict to east US
   dplyr::filter(`longitude` > -100) %>%
   ## restrict to continental US
   dplyr::filter(!State %in% c("AK", "HI", "VI", "GU", "PR", "VI")) %>%
-  dplyr::distinct(Organization, Name) %>%
-  dplyr::group_by(Organization) %>%
-  dplyr::summarise(n())
-
+  ## restrict to states completely east of 100th meridian
+  dplyr::filter(!State %in% c("ND", "SD", "NE", "KS", "OK", "TX")) %>%
   {.}
 
 ## filter area greater than 0
 buildingData <- buildingData %>%
-  dplyr::filter(`GSF` > 0)
+  dplyr::filter(`GSF` > 0) %>%
+  {.}
+
+## filter by building with positive electricity and gas consumption during any months in the 3 year period
+buildingData <- buildingData %>%
+  dplyr::group_by(`Organization`, `Name`) %>%
+  dplyr::mutate(positiveElec=sum(`Electric_(kBtu)`)>0, positiveGas=sum(`Gas_(kBtu)`)>0) %>%
+  dplyr::ungroup() %>%
+  dplyr::filter(positiveElec, positiveGas) %>%
+  {.}
 
 climateRegionLookup = readr::read_csv("~/Dropbox/thesis/code/pubPriCmp/data-raw/climateRegionLookup.csv") %>%
   as.data.frame() %>%
