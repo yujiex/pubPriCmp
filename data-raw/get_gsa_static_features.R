@@ -39,12 +39,6 @@ gsa_type_detail =
 
 head(gsa_type_detail)
 
-## ## no duplicate
-## gsa_type_detail %>%
-##   dplyr::group_by(Name) %>%
-##   filter(n()>1) %>%
-##   head()
-
 gsa_other_detail <-
   readxl::read_excel("Unlocked GSA Energy Start Data Entire Portfolio_09142015.xlsx", sheet=4, skip=5) %>%
   dplyr::mutate(`Name` = substr(`Property Name`, 1, 8)) %>%
@@ -62,24 +56,7 @@ gsa_other_detail <-
   dplyr::rename(`type_detail`=`Property Use Name`) %>%
   {.}
 
-
-## built year is not identifiable due to formatting issue in "Entire GSA
-## Portfolio..." table
-
-## gsa_ownership_1 =
-##   db.interface::read_table_from_db(dbname = "other_input", tablename = "Entire_GSA_Building_Portfolio_input") %>%
-##   dplyr::select(`Building Number`, `Owned or Leased Indicator`) %>%
-##   dplyr::rename(`Name`=`Building Number`) %>%
-##   dplyr::filter(Name %in% gsa.buildings) %>%
-##   {.}
-
-## gsa_ownership_2 =
-##   readxl::read_excel("ownership from the web/iolp-buildings.xlsx") %>%
-##   dplyr::filter(`LOCATION_CODE` %in% gsa.buildings.shortname) %>%
-##   dplyr::select(`Building Number`, `Owned or Leased Indicator`) %>%
-##   dplyr::rename(`Name`=`Building Number`) %>%
-##   dplyr::filter(Name %in% gsa.buildings) %>%
-##   {.}
+head(gsa_other_detail)
 
 gsa_ownership_gsf =
   db.interface::read_table_from_db(dbname = "all", tablename="EUAS_monthly",
