@@ -17,14 +17,6 @@ gsa_energy = db.interface::read_table_from_db(dbname = "all", tablename = "EUAS_
   dplyr::rename(`Name`=`Building_Number`) %>%
   {.}
 
-avg_sqft = gsa_energy %>%
-  dplyr::group_by(`Name`) %>%
-  dplyr::summarise(`Gross_Sq.Ft`=mean(`Gross_Sq.Ft`)) %>%
-  dplyr::ungroup() %>%
-  {.}
-
-sum(avg_sqft$Gross_Sq.Ft)
-
 ## checked for duplicates, no duplicates
 ## gsa_energy %>%
 ##   dplyr::group_by(`Name`, `year`, `month`) %>%
