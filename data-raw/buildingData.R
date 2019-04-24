@@ -104,6 +104,7 @@ read_pnc_single_data <- function(pathname, filename, energyType, outColName, uni
 files = list.files(path="pnc_electric", pattern = "*.csv")
 acc_elec <- lapply(files, function(f) read_pnc_single_data(pathname="pnc_electric", filename=f, energyType="electric", outColName="Electric_(kBtu)", unitConversionFactor=3.14))
 
+## do not have ways to tell which one is the correct record, so just take one record
 pnc_electric = do.call(rbind, acc_elec) %>>%
   dplyr::group_by(`Name`, `year`, `month`) %>>%
   (?nrow(.)) %>>%
