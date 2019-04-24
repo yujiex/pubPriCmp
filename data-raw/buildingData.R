@@ -122,12 +122,13 @@ pnc_energy = pnc_electric %>>%
 ##   dplyr::filter(n() > 1) %>>%
 ##   head()
 
-## pnc_static =
-##   readr::read_csv("~/Dropbox/thesis/writeups/policy_cmp/tables/pnc_static.csv") %>>%
-##   as.data.frame() %>>%
-##   dplyr::rename(`State`=`state`,
-##                 `City`=`city`) %>>%
-##   {.}
+pnc_city_state =
+  readr::read_csv("~/Dropbox/thesis/writeups/policy_cmp/tables/pnc_static.csv") %>>%
+  tibble::as_data_frame() %>>%
+  dplyr::select(Name, state, city) %>%
+  dplyr::rename(`State`=`state`,
+                `City`=`city`) %>>%
+  {.}
 
 ## changed source of static from pnc_static.csv to pnc_building_meta_data_from_pi_system.csv
 pnc_static =
@@ -138,15 +139,10 @@ pnc_static =
                 `type_general`=`Building Class`,
                 `type_detail`=`Building Use`,
                 ) %>%
+  ## remove state record here as this source does not have the correct state and city info
+  dplyr::select(-`Building Address`, -Region, -Status, -`Building Code`, -`State`, -`City`) %>%
+  dplyr::left_join(pnc_city_state, by="Name") %>%
   {.}
-
-pnc_area = pnc_static %>%
-  dplyr::group_by(`Name`) %>%
-  dplyr::summarise(`GSF`=mean(`GSF`)) %>%
-  dplyr::ungroup() %>%
-  {.}
-
-sum(pnc_area$GSF)
 
 pnc_building =
   pnc_energy %>>%
