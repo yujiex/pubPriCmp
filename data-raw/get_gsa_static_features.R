@@ -74,9 +74,22 @@ gsa_other_detail <-
   dplyr::select(-`Detail Current as of Date`) %>%
   tidyr::spread(`Detail Name`, `Detail Value`) %>%
   dplyr::rename(`type_detail`=`Property Use Name`) %>%
+  dplyr::rename(`Sum of Employees`=`Number of Workers on Main Shift`) %>%
+  dplyr::mutate_at(vars(`Sum of Employees`, `Number of Computers`, `Weekly Operating Hours`), as.numeric) %>%
   {.}
 
 head(gsa_other_detail)
+
+gsa_built_year =
+  readxl::read_excel("Unlocked GSA Energy Start Data Entire Portfolio_09142015.xlsx", sheet=1, skip=5) %>%
+  dplyr::select(`Property Name`, `Year Built`) %>%
+  dplyr::mutate(`Name` = substr(`Property Name`, 1, 8)) %>%
+  dplyr::select(-`Property Name`) %>%
+  ## only keep non-conflicting record
+  dplyr::group_by(`Name`) %>%
+  filter(n()==1) %>%
+  dplyr::ungroup() %>%
+  {.}
 
 gsa_ownership_gsf =
   db.interface::read_table_from_db(dbname = "all", tablename="EUAS_monthly",
