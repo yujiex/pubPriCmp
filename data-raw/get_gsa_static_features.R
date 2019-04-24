@@ -101,6 +101,13 @@ gsa_ownership_gsf_alltime <-
   ## dplyr::filter(Name %in% gsa.buildings) %>%
   {.}
 
+## read recode table for the building types
+## I manually unified some non-standard building type names
+gsa_detail_use_recode <-
+  readr::read_csv("recode_type_detail_gsa.csv") %>%
+  na.omit() %>%
+  {.}
+
 ## static informaiton by month
 gsa_static_monthly <-
   gsa_ownership_gsf %>%
@@ -110,7 +117,19 @@ gsa_static_monthly <-
   (?nrow(.)) %>>%
   dplyr::left_join(gsa_other_detail, by="Name") %>>%
   (?nrow(.)) %>>%
+  dplyr::select(-`Property Use Name`) %>%
+  ## recode detailed use
+  dplyr::left_join(gsa_detail_use_recode, by=c("type_general", "type_detail")) %>%
+  dplyr::mutate(`type_detail`=ifelse(is.na(`recode_detail`), `type_detail`, `recode_detail`)) %>>%
+  (?head(.)) %>>%
+  ## remove building ID from the use type
+  dplyr::mutate(`type_detail`=ifelse(grepl("[A-Z]{2}[0-9]{4}[A-Z]{2}[ -]{1,3}", `type_detail`), substr(`type_detail`, attr(regexpr("[A-Z]{2}[0-9]{4}[A-Z]{2}[ -]{1,3}", `type_detail`), "match.length") + 1, nchar(`type_detail`)), `type_detail`)) %>%
+  dplyr::select(-`recode_detail`) %>%
   {.}
+
+gsa_static_monthly %>%
+  distinct(`type_detail`) %>%
+  print(n=Inf)
 
 ## static information throughout the period, with aggregated ownership and average GSF
 gsa_static_alltime <-
@@ -121,9 +140,16 @@ gsa_static_alltime <-
   (?nrow(.)) %>>%
   dplyr::left_join(gsa_other_detail, by="Name") %>>%
   (?nrow(.)) %>>%
+  dplyr::select(-`Property Use Name`) %>%
+  ## recode detailed use
+  dplyr::left_join(gsa_detail_use_recode, by=c("type_general", "type_detail")) %>%
+  dplyr::mutate(`type_detail`=ifelse(is.na(`recode_detail`), `type_detail`, `recode_detail`)) %>>%
+  (?head(.)) %>>%
+  ## remove building ID from the use type
+  dplyr::mutate(`type_detail`=ifelse(grepl("[A-Z]{2}[0-9]{4}[A-Z]{2}[ -]{1,3}", `type_detail`), substr(`type_detail`, attr(regexpr("[A-Z]{2}[0-9]{4}[A-Z]{2}[ -]{1,3}", `type_detail`), "match.length") + 1, nchar(`type_detail`)), `type_detail`)) %>%
+  dplyr::select(-`recode_detail`) %>%
   {.}
-## add area to the static set
 
+## save to data files
 devtools::use_data(gsa_static_monthly, pkg="../../pubPriCmp", overwrite = TRUE)
-
 devtools::use_data(gsa_static_alltime, pkg="../../pubPriCmp", overwrite = TRUE)
