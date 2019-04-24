@@ -188,13 +188,19 @@ buildingData =
   {.}
 
 ## print earliest and latest energy date, to select common time range for analysis
+## show latest time
 buildingData %>%
   dplyr::arrange(`year`, `month`) %>%
   dplyr::group_by(`private`) %>%
-  ## show latest time
   slice(n()) %>%
-  ## show earliest time
-  ## slice(1) %>%
+  dplyr::ungroup() %>%
+  print()
+## show earliest time
+buildingData %>%
+  dplyr::arrange(`year`, `month`) %>%
+  dplyr::group_by(`private`) %>%
+  slice(1) %>%
+  dplyr::ungroup() %>%
   print()
 
 ## earliest time for pnc and gsa are:
