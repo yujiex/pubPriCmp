@@ -18,31 +18,18 @@ gsa_energy = db.interface::read_table_from_db(dbname = "all", tablename = "EUAS_
   dplyr::rename(`Name`=`Building_Number`) %>%
   {.}
 
-head(gsa_energy)
-
-## do not take mean area maybe
-## gsa_area = allData %>%
-##   dplyr::filter(Organization=="GSA") %>%
-##   dplyr::group_by(Name) %>%
-##   dplyr::summarise(GSF=mean(GSF)) %>%
-##   {.}
-
-gsa.buildings.shortname =
-  substr(gsa.buildings, 1, 6)
-
 gsa_type_general =
   db.interface::read_table_from_db(dbname="all", tablename = "EUAS_type_recode") %>%
   dplyr::mutate_at(vars(`Building_Type`), recode, "Other - Public Services"="Public Services", "Other - Services"="Service") %>%
   dplyr::select(-`data_source`) %>%
   dplyr::rename(`Name`=`Building_Number`, `type_general`=`Building_Type`) %>%
-  ## dplyr::filter(Name %in% gsa.buildings) %>%
   {.}
 
 gsa_type_detail =
   readxl::read_excel("Unlocked GSA Energy Start Data Entire Portfolio_09142015.xlsx", sheet=3, skip=5) %>%
   dplyr::mutate(`Name` = substr(`Property Name`, 1, 8)) %>%
   dplyr::select(`Name`, `Property Use Name`, `Gross Floor Area for Use`) %>%
-  ## dplyr::mutate(`Use Type`=ifelse(grepl("Other - ", `Use Type`), substr(`Use Type`, 9, nchar(`Use Type`)), `Use Type`)) %>%
+  ## select the dominant use which has the largest floor area
   dplyr::arrange(`Name`, desc(`Gross Floor Area for Use`)) %>%
   dplyr::group_by(`Name`) %>%
   dplyr::slice(1) %>%
