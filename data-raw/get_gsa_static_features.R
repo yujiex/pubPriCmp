@@ -18,6 +18,26 @@ gsa_energy = db.interface::read_table_from_db(dbname = "all", tablename = "EUAS_
   dplyr::rename(`Name`=`Building_Number`) %>%
   {.}
 
+gsa_zipcode =
+  db.interface::read_table_from_db(dbname = "all", tablename = "EUAS_address", cols=c("Building_Number", "Zip_Code", "source")) %>%
+  dplyr::filter(!is.na(`Zip_Code`)) %>%
+  dplyr::mutate(`Zip_Code`=substr(`Zip_Code`, 1, 5)) %>%
+  dplyr::group_by(`Building_Number`, `Zip_Code`) %>%
+  dplyr::slice(1) %>%
+  dplyr::ungroup() %>%
+  ## randomly checked a few buildings, seems the "Entire Portfolio*" file has more accurate zip code record
+  dplyr::mutate(`source` = factor(`source`,
+                                       levels = c("Entire_GSA_Building_Portfolio_input",
+                                                  "PortfolioManager_sheet0_input"))) %>%
+  dplyr::arrange(`Building_Number`, `source`) %>%
+  dplyr::group_by(`Building_Number`) %>%
+  slice(1) %>%
+  dplyr::ungroup() %>%
+  dplyr::select(-source) %>%
+  dplyr::rename(`Name`=`Building_Number`,
+                `Zip Code`=`Zip_Code`) %>%
+  {.}
+
 gsa_type_general =
   db.interface::read_table_from_db(dbname="all", tablename = "EUAS_type_recode") %>%
   dplyr::mutate_at(vars(`Building_Type`), recode, "Other - Public Services"="Public Services", "Other - Services"="Service") %>%
