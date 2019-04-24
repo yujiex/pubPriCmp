@@ -4,14 +4,6 @@ library("readxl")
 library("pipeR")
 
 devtools::load_all("~/Dropbox/gsa_2017/db.interface")
-
-## load("../data/allData.rda")
-## gsa.buildings = allData %>%
-##   dplyr::filter(Organization=="GSA") %>%
-##   distinct(Name) %>%
-##   .$Name
-
-devtools::load_all("~/Dropbox/gsa_2017/db.interface")
 gsa_energy = db.interface::read_table_from_db(dbname = "all", tablename = "EUAS_monthly",
                                               cols=c("Building_Number", "state_abbr", "Gross_Sq.Ft", "year", "month",
                                                      "Electric_(kBtu)", "Gas_(kBtu)")) %>%
@@ -127,6 +119,10 @@ gsa_static_monthly <-
   (?nrow(.)) %>>%
   dplyr::left_join(gsa_other_detail, by="Name") %>>%
   (?nrow(.)) %>>%
+  dplyr::left_join(gsa_zipcode, by="Name") %>>%
+  (?nrow(.)) %>>%
+  dplyr::left_join(gsa_built_year, by="Name") %>>%
+  (?nrow(.)) %>>%
   dplyr::select(-`Property Use Name`) %>%
   ## recode detailed use
   dplyr::left_join(gsa_detail_use_recode, by=c("type_general", "type_detail")) %>%
@@ -137,10 +133,6 @@ gsa_static_monthly <-
   dplyr::select(-`recode_detail`) %>%
   {.}
 
-gsa_static_monthly %>%
-  distinct(`type_detail`) %>%
-  print(n=Inf)
-
 ## static information throughout the period, with aggregated ownership and average GSF
 gsa_static_alltime <-
   gsa_ownership_gsf_alltime %>%
@@ -149,6 +141,10 @@ gsa_static_alltime <-
   dplyr::left_join(gsa_type_detail, by="Name") %>>%
   (?nrow(.)) %>>%
   dplyr::left_join(gsa_other_detail, by="Name") %>>%
+  (?nrow(.)) %>>%
+  dplyr::left_join(gsa_zipcode, by="Name") %>>%
+  (?nrow(.)) %>>%
+  dplyr::left_join(gsa_built_year, by="Name") %>>%
   (?nrow(.)) %>>%
   dplyr::select(-`Property Use Name`) %>%
   ## recode detailed use
