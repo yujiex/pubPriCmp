@@ -51,9 +51,21 @@ gsa_city =
   dplyr::rename(`Name`=`Building_Number`) %>%
   {.}
 
+load("../data/gsa_static_monthly.rda")
+
+gsa_static_monthly <- gsa_static_monthly %>%
+  dplyr::select(-GSF) %>%
+  {.}
+
+summary(gsa_static_monthly)
+
 gsa_building = gsa_energy %>%
-  dplyr::left_join(gsa_lat_lon, by="Name") %>%
-  dplyr::left_join(gsa_city, by="Name") %>%
+  dplyr::left_join(gsa_lat_lon, by="Name") %>>%
+  (?nrow(.)) %>>%
+  dplyr::left_join(gsa_city, by="Name") %>>%
+  (?nrow(.)) %>>%
+  dplyr::left_join(gsa_static_monthly, by=c("Name", "year", "month")) %>>%
+  (?nrow(.)) %>>%
   dplyr::rename(`State`=`state_abbr`) %>%
   dplyr::mutate(`Organization`="GSA") %>%
   dplyr::rename(`GSF`=`Gross_Sq.Ft`) %>%
