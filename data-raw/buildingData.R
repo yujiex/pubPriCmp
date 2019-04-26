@@ -329,6 +329,8 @@ buildingData <- buildingData %>%
 buildingData %>%
   readr::write_csv("~/Dropbox/thesis/code/pubPriCmp/data/buildingData.csv")
 
+devtools::use_data(buildingData, pkg="../../pubPriCmp", overwrite = TRUE)
+
 buildingLatlng = buildingData %>%
   dplyr::select(-`Electric_(kBtu)`, -`Gas_(kBtu)`) %>%
   dplyr::group_by(`Name`) %>%
@@ -336,7 +338,16 @@ buildingLatlng = buildingData %>%
   ungroup() %>%
   {.}
 
+buildingLatlng %>%
+  readr::write_csv("~/Dropbox/thesis/code/pubPriCmp/data/buildingLatlng.csv")
+
+devtools::use_data(buildingLatlng, pkg="../../pubPriCmp", overwrite = TRUE)
+
+## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+## first run getWarmthClass.R to get the state warmth class then run this
+## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
 load("../data/buildingData.rda")
+
 load("../data/warmthClass_lat.rda")
 
 USregion = warmthClass_lat %>%
@@ -371,6 +382,10 @@ buildingData <-
   {.}
 
 devtools::use_data(pkg="~/Dropbox/thesis/code/pubPriCmp", buildingData, overwrite = TRUE)
+
+## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+## first run getWarmthClass.R to get the state warmth class then run this end
+## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
 
 ghcnd_data_full = rnoaa::ghcnd_stations(refresh = TRUE)
 
