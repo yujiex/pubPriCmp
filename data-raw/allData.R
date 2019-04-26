@@ -19,6 +19,12 @@ allData = buildingData %>%
   dplyr::mutate(`Date`=as.character(`Date`)) %>%
   {.}
 
+## check how many buildings in each portfolio
+allData %>%
+  distinct(Organization, Name) %>%
+  dplyr::group_by(Organization) %>%
+  dplyr::summarise(n())
+
 devtools::use_data(pkg="~/Dropbox/thesis/code/pubPriCmp", allData, overwrite = TRUE)
 
 allData %>%
