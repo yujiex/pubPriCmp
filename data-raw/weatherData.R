@@ -27,7 +27,9 @@ duration = "years"
 start_times = seq(as.Date("2011-01-01"), as.Date("2013-01-01"), duration)
 end_times = seq(as.Date("2011-12-31"), as.Date("2013-12-31"), duration)
 
-v = "TMIN"
+## change this to TMIN or TMAX
+## v = "TMIN"
+v = "TMAX"
 ## only search regarding the variables interested
 ghcnd_data_var = ghcnd_data_full %>%
   dplyr::filter(`element` == v) %>%
@@ -51,10 +53,11 @@ for (j in 1:3) {
   start = 1
   counter = start
   for (b in buildings[start:length(buildings)]) {
+    print(b)
     ## this part only downloads data
     if (!file.exists(sprintf("~/Dropbox/thesis/code/pubPriCmp/data-raw/building_%s/%s_station_distance_%s_%s.csv",
                             v, b, v, date_min))) {
-      print(sprintf("%s --------------%s -----------", counter, b))
+      print(sprintf("downloading %s --------------%s -----------", counter, b))
       b_loc = buildingLatlng %>%
         dplyr::filter(`Name`==b) %>%
         {.}
@@ -288,5 +291,3 @@ for (f in files) {
 
 acc %>%
   feather::write_feather("building_mean_avgminmax.feather")
-
-getwd()
