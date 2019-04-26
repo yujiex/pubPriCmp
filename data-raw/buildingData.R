@@ -187,41 +187,12 @@ buildingData =
   dplyr::select(-`withRetrofit`) %>%
   {.}
 
-## print earliest and latest energy date, to select common time range for analysis
-## show latest time
+## keeping records with valid lat lon, how many buildings remain
 buildingData %>%
-  dplyr::arrange(`year`, `month`) %>%
-  dplyr::group_by(`private`) %>%
-  slice(n()) %>%
-  dplyr::ungroup() %>%
+  distinct(Name, Organization) %>%
+  dplyr::group_by(Organization) %>%
+  dplyr::summarise(n()) %>%
   print()
-## show earliest time
-buildingData %>%
-  dplyr::arrange(`year`, `month`) %>%
-  dplyr::group_by(`private`) %>%
-  slice(1) %>%
-  dplyr::ungroup() %>%
-  print()
-
-## earliest time for pnc and gsa are:
-##   Name         GSF  year month `Electric_(kBtu… `Gas_(kBtu)` latitude longitude
-##   <chr>      <dbl> <dbl> <dbl>            <dbl>        <dbl>    <dbl>     <dbl>
-## 1 AK0000AA  727340  2002  10.0          2522150      1939140     61.2    -150
-## 2 Hampstea…   4291  2010  10.0               NA            0     39.6    - 76.9
-
-## latest time for pnc and gsa are:
-## Name         GSF  year month `Electric_(kBtu… `Gas_(kBtu)` latitude longitude
-##   <chr>      <dbl> <dbl> <dbl>            <dbl>        <dbl>    <dbl>     <dbl>
-## 1 WY0030ZZ  174831  2017  9.00           307899       139530     42.9    -106
-## 2 ZionOffi…   4635  2014  3.00               NA        49400     42.4    - 87.8
-
-## restrict the analysis time range to the common range with full year: 2011-01 to 2013-12
-buildingData <-
-  buildingData %>%
-  dplyr::arrange(`year`, `month`) %>%
-  dplyr::mutate(`Date`=zoo::as.yearmon(paste(`year`, `month`), "%Y %m")) %>%
-  dplyr::filter((zoo::as.yearmon("201101", "%Y %m") <= Date) & (Date <= zoo::as.yearmon("201312", "%Y%m"))) %>%
-  {.}
 
 buildingLatlng = buildingData %>%
   dplyr::select(-`Electric_(kBtu)`, -`Gas_(kBtu)`) %>%
@@ -261,8 +232,7 @@ buildingLatlng %>%
   addProviderTiles(providers$CartoDB.Positron)
 
 ## apply the same spacial filter
-buildingData <-
-  buildingData %>%
+buildingData <- buildingData %>%
   ## restrict to east US
   dplyr::filter(`longitude` > -100) %>%
   ## restrict to continental US
@@ -271,10 +241,66 @@ buildingData <-
   dplyr::filter(!State %in% c("ND", "SD", "NE", "KS", "OK", "TX")) %>%
   {.}
 
+## keeping records in continental US within states completely east of 100th meridian, how many buildings remain
+buildingData %>%
+  distinct(Name, Organization) %>%
+  dplyr::group_by(Organization) %>%
+  dplyr::summarise(n()) %>%
+  print()
+
+## print earliest and latest energy date, to select common time range for analysis
+## show latest time
+buildingData %>%
+  dplyr::arrange(`year`, `month`) %>%
+  dplyr::group_by(`private`) %>%
+  slice(n()) %>%
+  dplyr::ungroup() %>%
+  print()
+## show earliest time
+buildingData %>%
+  dplyr::arrange(`year`, `month`) %>%
+  dplyr::group_by(`private`) %>%
+  slice(1) %>%
+  dplyr::ungroup() %>%
+  print()
+
+## earliest time for pnc and gsa are:
+## Name          State    GSF  year month `Electric_(kBtu… `Gas_(kBtu)` latitude
+##   <chr>         <chr>  <dbl> <dbl> <dbl>            <dbl>        <dbl>    <dbl>
+## 1 AL0000AB      AL    399656  2002  10.0          2123970        33345     30.7
+## 2 Hampstead232… MD      4291  2010  10.0                0            0     39.6
+
+## latest time for pnc and gsa are:
+## Name       State   GSF  year month `Electric_(kBtu)` `Gas_(kBtu)` latitude
+## <chr>      <chr> <dbl> <dbl> <dbl>             <dbl>        <dbl>    <dbl>
+## 1 WV1251ZZ   WV    53550  2017  9.00            171637         4104     38.9
+## 2 ZionOffice IL     4635  2014  3.00                 0        49400     42.4
+
+## restrict the analysis time range to the common range with full year: 2011-01 to 2013-12
+buildingData <- buildingData %>%
+  dplyr::arrange(`year`, `month`) %>%
+  dplyr::mutate(`Date`=zoo::as.yearmon(paste(`year`, `month`), "%Y %m")) %>%
+  dplyr::filter((zoo::as.yearmon("201101", "%Y %m") <= Date) & (Date <= zoo::as.yearmon("201312", "%Y%m"))) %>%
+  {.}
+
+## keeping records with common years, how many buildings remain
+buildingData %>%
+  distinct(Name, Organization) %>%
+  dplyr::group_by(Organization) %>%
+  dplyr::summarise(n()) %>%
+  print()
+
 ## filter area greater than 0
 buildingData <- buildingData %>%
   dplyr::filter(`GSF` > 0) %>%
   {.}
+
+## keeping records with positive sqft, how many buildings remain
+buildingData %>%
+  distinct(Name, Organization) %>%
+  dplyr::group_by(Organization) %>%
+  dplyr::summarise(n()) %>%
+  print()
 
 ## filter by building with positive electricity and gas consumption during any months in the 3 year period
 buildingData <- buildingData %>%
@@ -283,6 +309,13 @@ buildingData <- buildingData %>%
   dplyr::ungroup() %>%
   dplyr::filter(positiveElec, positiveGas) %>%
   {.}
+
+## keeping records with both electricity and gas consumption, how many buildings remain
+buildingData %>%
+  distinct(Name, Organization) %>%
+  dplyr::group_by(Organization) %>%
+  dplyr::summarise(n()) %>%
+  print()
 
 climateRegionLookup = readr::read_csv("~/Dropbox/thesis/code/pubPriCmp/data-raw/climateRegionLookup.csv") %>%
   as.data.frame() %>%
