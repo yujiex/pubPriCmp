@@ -110,6 +110,10 @@ for (j in 1:3) {
 for (b in buildings) {
   ## for (b in buildings[start:length(buildings)]) {
   print(b)
+  if (file.exists(sprintf("~/Dropbox/thesis/code/pubPriCmp/data-raw/building_AVGMINMAX/%s.feather", b))) {
+    print("building AVGMINNMAX already created -----")
+    next
+  }
   acc = NULL
   for (v in c("TMIN", "TMAX")) {
     for (j in 1:3) {
