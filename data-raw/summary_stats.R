@@ -2100,44 +2100,27 @@ allDataGreen %>%
   dplyr::summarise(n())
 
 ## comparing static characteristics of the two portfolio
-load("../data/gsa_static_studyset.rda")
+load("../data/allDataGreen.rda")
 
-load("../data/pnc_static_studyset.rda")
+allDataGreen %>%
+  names()
 
-gsa_static_studyset <- gsa_static_studyset %>%
-  dplyr::mutate(Portfolio="public")
-pnc_static_studyset <- pnc_static_studyset %>%
-  dplyr::mutate(Portfolio="private")
-
-gsa_static_studyset %>%
-  summary()
-
-gsa_static_studyset %>%
-  distinct(`Building Type`)
-
-names(gsa_static_studyset)
-
-names(pnc_static_studyset)
-
-dfstatic =
-  pnc_static_studyset %>%
-  dplyr::select(-City, -Region, -State, -`Zip Code`, -`Building Address`, -`Building Code`, -`Status`) %>%
-  dplyr::bind_rows(gsa_static_studyset) %>%
+dfstatic = allDataGreen %>%
+  dplyr::select(-`latitude`, -`longitude`, -`City`, -`State`, -`year`, -`Organization`, -`Date`) %>%
+  dplyr::mutate(Portfolio=ifelse(private==0, "public", "private")) %>%
   {.}
 
-pnc_static_studyset %>%
-  distinct(Status)
-
 ## comparing building types of the two portfolio
-num.building.per.type <-
-  dfstatic %>%
-  dplyr::group_by(Portfolio, `Building Type`) %>%
+num.building.per.type <- dfstatic %>%
+  dplyr::distinct(Name, Portfolio, `type_general`) %>%
+  dplyr::group_by(Portfolio, `type_general`) %>%
   dplyr::summarise(n()) %>%
   dplyr::ungroup() %>%
   tidyr::spread(`Portfolio`, `n()`, fill=0L) %>%
   dplyr::mutate(ordering = pmax(private, public)) %>%
   dplyr::arrange(desc(ordering)) %>%
   dplyr::select(-ordering) %>%
+  dplyr::mutate_at(vars(`type_general`), ~replace(., is.na(.), "Unknown")) %>%
   {.}
 result_table_tex <- xtable(num.building.per.type, caption="Building type count")
 print(result_table_tex, tabular.environment = "tabular", include.rownames=FALSE,
