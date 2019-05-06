@@ -370,16 +370,16 @@ devtools::use_data(pkg="~/Dropbox/thesis/code/pubPriCmp", USregionWiki, overwrit
 buildingData %>%
   nrow()
 
-buildingData <-
-  buildingData %>%
-  ## dplyr::left_join(USregion, by="State") %>%
-  dplyr::left_join(USregionWiki, by="State") %>%
+buildingData <- buildingData %>>%
+  dplyr::left_join(USregion, by="State") %>>%
+  (?nrow(.)) %>>%
+  dplyr::left_join(USregionWiki, by="State") %>>%
+  (?nrow(.)) %>>%
   {.}
 
 ## don't know why the data from running the code does not have month in Date
-buildingData <-
-  readr::read_csv("~/Dropbox/thesis/code/pubPriCmp/data/buildingData.csv") %>%
-  {.}
+buildingData %>%
+  readr::write_csv("~/Dropbox/thesis/code/pubPriCmp/data/buildingData.csv")
 
 devtools::use_data(pkg="~/Dropbox/thesis/code/pubPriCmp", buildingData, overwrite = TRUE)
 
