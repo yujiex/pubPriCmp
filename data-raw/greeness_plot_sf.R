@@ -11,14 +11,25 @@ library("RColorBrewer")
 greeness_keyword = "greeness2category"
 ## ## for 3 category use this
 ## greeness_keyword = "greeness"
-df_green = readr::read_csv(sprintf("~/Dropbox/thesis/code/pubPriCmp/data-raw/%s_combine_source_majority_vote.csv", greeness_keyword)) %>%
-  tibble::as_data_frame() %>%
+df_green = readr::read_csv(sprintf("%s_combine_source_majority_vote.csv", greeness_keyword)) %>%
+  tibble::as_tibble() %>%
+  {.}
+
+df_green %>%
+  distinct(Majority)
+
+df_green_howe_state = readr::read_csv(sprintf("%s_howe_state.csv", greeness_keyword)) %>%
+  tibble::as_tibble() %>%
+  dplyr::rename(`STUSPS`=`State`, `Rating`=`greeness.howe.state`) %>%
+  dplyr::mutate(Source="Howe") %>%
+  dplyr::select(-`x65_happening_state`) %>%
   {.}
 
 df_green_long = df_green %>%
   tidyr::gather(`Source`, `Rating`, `Majority`:`Forbes`) %>%
   dplyr::mutate_at(vars(Rating), dplyr::recode, "Morderate Green"="Moderate Green") %>%
   dplyr::rename(`STUSPS`=`State`) %>%
+  dplyr::bind_rows(df_green_howe_state) %>%
   na.omit() %>%
   {.}
 
@@ -31,8 +42,10 @@ map_data =
   dplyr::right_join(df_green_long, by="STUSPS") %>%
   {.}
 
+## plot individual source vs majority votes
 p <- map_data %>%
   dplyr::filter(!`STUSPS` %in% c("AK", "HI")) %>%
+  dplyr::filter(Source != "Howe") %>%
   dplyr::mutate(`Source`=factor(`Source`, levels = c("NCSL", "Forbes", "WalletHub", "Majority"))) %>%
   ggplot() +
   geom_sf(aes(fill = Rating))
@@ -49,6 +62,28 @@ p <- p +
   ggplot2::facet_wrap(~Source, ncol=2)
 print(p)
 ggplot2::ggsave(file=sprintf("../image/%s_plot.png", greeness_keyword), width=6, height=4, units="in")
+
+## plot majority vs howe
+p <-
+  map_data %>%
+  dplyr::filter(!`STUSPS` %in% c("AK", "HI")) %>%
+  dplyr::filter(Source %in% c("Howe", "Majority")) %>%
+  dplyr::mutate(`Source`=factor(`Source`, levels = c("Majority", "Howe"))) %>%
+  ggplot() +
+  geom_sf(aes(fill = Rating))
+if (greeness_keyword == "greeness") {
+  p <- p +
+    ggplot2::scale_fill_brewer(palette="Greens")
+} else if (greeness_keyword == "greeness2category") {
+  p <- p +
+    ggplot2::scale_fill_manual(values = RColorBrewer::brewer.pal(3, "Greens")[c(2, 3)], name="State Greeness Rating")
+}
+p <- p +
+  ggplot2::theme_bw() +
+  ggplot2::theme(text = element_text(size=10), legend.position = "bottom") +
+  ggplot2::facet_wrap(~Source, ncol=2)
+print(p)
+ggplot2::ggsave(file=sprintf("../image/%s_plot_majority_howe.png", greeness_keyword), width=6, height=4, units="in")
 
 ## show hex for palette
 ## RColorBrewer::brewer.pal(n=3, name="Greens")
@@ -145,7 +180,7 @@ buildinglatlng = retrofit_allData %>%
 
 buildingTemp =
   readr::read_csv("building_mean_temperature_05to17.csv") %>%
-  tibble::as_data_frame() %>%
+  tibble::as_tibble() %>%
   dplyr::left_join(buildinglatlng, by="Name") %>%
   dplyr::rename(`average monthly temperature`=`mean_avgminmax`) %>%
   {.}
@@ -332,19 +367,46 @@ load("../data/allDataGreen.rda")
 
 unique(state_shape$STUSPS)
 
+cols = c("Greeness", "greeness.howe.state", "greeness.howe.county")
+captions = c("Greeness from Majority Vote of 3 Sources",
+             "Greeness from State Level Data of Howe 2015",
+             "Greeness from County Level Data of Howe 2015")
+
+for (i in seq_along(cols)) {
+  greenessCol = cols[i]
+  suf = gsub(".", "_", cols[i], fixed=TRUE)
+  allDataGreen %>%
+    distinct(`Organization`, !!rlang::sym(greenessCol), `latitude`, `longitude`) %>%
+    dplyr::mutate(`Organization`=recode(`Organization`, "GSA"="public", "PNC"="private")) %>%
+    dplyr::mutate(`Organization`=factor(`Organization`, levels=c("public", "private"))) %>%
+    ggplot2::ggplot() +
+    ggplot2::geom_point(ggplot2::aes(y=`latitude`, x=`longitude`, color=!!rlang::sym(greenessCol)), size=0.5) +
+    ggplot2::geom_sf(data=state_shape[!(state_shape$STUSPS) %in% c("AK", "HI", "PR"),], fill=NA) +
+    ggplot2::scale_color_manual(values = RColorBrewer::brewer.pal(3, "Greens")[c(2, 3)], name="Greeness Rating") +
+    ggplot2::facet_wrap(.~Organization) +
+    ggplot2::theme_bw() +
+    ggplot2::xlim(c(-95, NA)) +
+    ggplot2::ggtitle(captions[i]) +
+    ggplot2::theme(legend.position = "bottom")
+  ggplot2::ggsave(file=sprintf("../image/buildingGreeness2category_facet_%s.png", suf),
+                  width=8, height=4, units="in")
+  writefile <- file(sprintf("~/Dropbox/thesis/writeups/policy_cmp/tables/buildingGreeness2category_facet_%s.tex", suf), "w+")
+  sink(writefile)
+  allDataGreen %>%
+    distinct(`Organization`, !!rlang::sym(greenessCol), Name) %>%
+    dplyr::group_by(Organization, !!rlang::sym(greenessCol)) %>%
+    dplyr::summarise(count=n()) %>%
+    dplyr::ungroup() %>%
+    tidyr::spread(!!rlang::sym(greenessCol), count) %>%
+    knitr::kable("latex", booktabs = T) %>%
+    print()
+  sink()
+  close(writefile)
+}
+
 allDataGreen %>%
-  distinct(`Organization`, `Greeness`, `latitude`, `longitude`) %>%
-  dplyr::mutate(`Organization`=recode(`Organization`, "GSA"="public", "PNC"="private")) %>%
-  dplyr::mutate(`Organization`=factor(`Organization`, levels=c("public", "private"))) %>%
-  ggplot2::ggplot() +
-  ggplot2::geom_point(ggplot2::aes(y=`latitude`, x=`longitude`, color=`Greeness`), size=0.5) +
-  ggplot2::geom_sf(data=state_shape[!(state_shape$STUSPS) %in% c("AK", "HI", "PR"),], fill=NA) +
-  ggplot2::scale_color_manual(values = RColorBrewer::brewer.pal(3, "Greens")[c(2, 3)], name="State Greeness Rating") +
-  ggplot2::facet_wrap(.~Organization) +
-  ggplot2::theme_bw() +
-  ggplot2::xlim(c(-95, NA)) +
-  ggplot2::theme(legend.position = "bottom")
-ggplot2::ggsave(file="../image/buildingGreeness2category_facet.png", width=8, height=4, units="in")
+  filter(is.na(greeness.howe.state)) %>%
+  head()
 
 ## ## ## ## ## ## ## ## ## ## ##
 ## plot individual buildings two portfolio

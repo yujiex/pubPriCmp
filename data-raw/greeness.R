@@ -79,8 +79,7 @@ majority %>%
 ##     summarize(`Majority`=names(which.max(table(`Greeness`)))) %>%
 ##     {.}
 
-df_green_majority =
-  df %>%
+df_green_majority = df %>%
   tidyr::spread(`Source`, `Greeness`) %>%
   dplyr::select(`State`, `NCSL`, `WalletHub`, `Forbes`) %>%
   left_join(majority) %>%
@@ -215,15 +214,15 @@ for (i in 1:nrow(latlon)) {
 }
 
 acc %>%
-  tibble::as.tibble() %>%
+  tibble::as_tibble() %>%
   dplyr::select(-bbox) %>%
   readr::write_csv("area_info_from_fcc.csv")
 
 acc <- readr::read_csv("area_info_from_fcc.csv") %>%
-  tibble::as.tibble()
+  tibble::as_tibble()
 
 latlon2county <- acc %>%
-  tibble::as.tibble() %>%
+  tibble::as_tibble() %>%
   dplyr::distinct(latitude, longitude, `county_fips`, `county_name`, `state_code`) %>%
   {.}
 

@@ -83,6 +83,7 @@ df_state_abbr =
   readr::read_csv("~/Dropbox/thesis/code/pubPriCmp/data-raw/state_abbr.csv") %>%
   {.}
 
+## move to another file start
 ## read state average temperature to data frame
 state_average_temperature_2008to2012 =
   readr::read_csv("~/Dropbox/thesis/code/pubPriCmp/data-raw/stateAverageTemperature2008to2012.csv") %>%

@@ -24,10 +24,9 @@ gsa_energy = db.interface::read_table_from_db(dbname = "all", tablename = "EUAS_
 ##   print()
 
 ## get a dataframe with retrofit year month and indicator 1
-devtools::load_all("~/Dropbox/gsa_2017/db.interface")
 gsa_retrofit =
   db.interface::read_table_from_db(dbname = "all", tablename = "EUAS_ecm", cols=c("Building_Number", "Substantial_Completion_Date")) %>%
-  as_data_frame() %>%
+  as_tibble() %>%
   na.omit() %>%
   dplyr::rename(`Name`=`Building_Number`) %>%
   dplyr::mutate(`year` = as.integer(substr(`Substantial_Completion_Date`, start=1, stop=4)),
@@ -137,7 +136,7 @@ pnc_energy = pnc_electric %>>%
 
 pnc_city_state =
   readr::read_csv("~/Dropbox/thesis/writeups/policy_cmp/tables/pnc_static.csv") %>>%
-  tibble::as_data_frame() %>>%
+  tibble::as_tibble() %>>%
   dplyr::select(Name, state, city) %>%
   dplyr::rename(`State`=`state`,
                 `City`=`city`) %>>%
@@ -318,7 +317,7 @@ buildingData %>%
   print()
 
 climateRegionLookup = readr::read_csv("~/Dropbox/thesis/code/pubPriCmp/data-raw/climateRegionLookup.csv") %>%
-  as.data.frame() %>%
+  tibble::as_tibble() %>%
   {.}
 
 # get climate region
@@ -381,7 +380,7 @@ buildingData <- buildingData %>>%
 buildingData %>%
   readr::write_csv("~/Dropbox/thesis/code/pubPriCmp/data/buildingData.csv")
 
-devtools::use_data(pkg="~/Dropbox/thesis/code/pubPriCmp", buildingData, overwrite = TRUE)
+devtools::use_data(buildingData, pkg="~/Dropbox/thesis/code/pubPriCmp", overwrite = TRUE)
 
 ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
 ## first run getWarmthClass.R to get the state warmth class then run this end

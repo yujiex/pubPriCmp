@@ -8,6 +8,7 @@ library("xtable")
 library("stringi")
 library("zoo")
 library("MASS")
+library("kableExtra")
 
 load("~/Dropbox/thesis/code/pubPriCmp/data/allData.rda")
 
@@ -671,6 +672,10 @@ breaklabels = c("<10", "[10-20)", "[20-30)", "[30-40)",
 
 load("../data/allData.rda")
 
+
+## ------------------------------------------------------------------------------
+## main analysis plots older version start
+## ------------------------------------------------------------------------------
 ## portfolio = ""
 ## ## "_gas" is gas, "" is electricity
 ## energy_type = "_gas"
@@ -686,139 +691,391 @@ load("../data/allData.rda")
 ## df_zero = data.frame(X1="avgTemp60to70", variable=rep(c("coef", "ci_low", "ci_high"), 2),
 ##                      model=rep(c(rep("X2", 3), rep("X3", 3)), 2),
 ##                      value = 0, status=c(rep("public", 6)))
-portfolio = "_PNC"
-## energy_type = "_total"
+portfolio = "_GSA"
+## portfolio = "_PNC"
+energy_type = "_total"
 ## energy_type = "_gas"
+## energy_type = ""
+## status_code = "private"
+status_code = "public"
+## office.class = "o_o"
+## folder.suffix = paste0("_", office.class)
+## office.class = ""
+## folder.suffix = ""
+
+for (portfolio in c("_GSA", "_PNC")) {
+  ## could change this to other energy_type
+  for (ownership in c("owned", "owned_and_leased")) {
+    ## energy_type = "_total"
+    for (energy_type in c("_gas")) {
+      ## for (energy_type in c("", "_gas")) {
+      if (portfolio == "_PNC") {
+        status_code = "private"
+      } else if (portfolio == "_GSA") {
+        status_code = "public"
+      }
+      df_zero = data.frame(X1="avgTemp60to70", variable=rep(c("coef", "ci_low", "ci_high"), 2),
+                          model=rep(c(rep("X2", 3), rep("X3", 3)), 2),
+                          value = 0, status=c(rep(status_code, 6)))
+      for (office.class in c("", "o_o", "o_oct", "r_o", "ro_oct")) {
+        if (nchar(office.class) == 0) {
+          folder.suffix = ""
+        } else {
+          folder.suffix = paste0("_", office.class, "_", ownership)
+        }
+        ## produce the bin coefficient and CI plot for the model with both portfolio
+        df =
+          readr::read_tsv(sprintf("~/Dropbox/thesis/writeups/policy_cmp/tables/reg_result%s/regression_results_bin_0720%s%s.txt", folder.suffix, tolower(portfolio), energy_type), skip=7, col_names=FALSE) %>%
+        ## remove bottom non-conformative rows
+          head(-5) %>%
+          dplyr::mutate(`variable`=rep(c("coef", "se", "ci_low", "ci_high"), nrow(.)/4)) %>%
+          tidyr::fill(`X1`) %>%
+          tidyr::unite(`temp`, `X1`, `variable`, sep="-") %>%
+          tidyr::gather(`model`, `value`, starts_with("X")) %>%
+          tidyr::separate(`temp`, c("X1", "variable"), sep="-") %>%
+          dplyr::filter(`variable` != "se",
+                        !grepl("0b.", `X1`, fixed = TRUE),
+                        !grepl("eDate", `X1`, fixed = TRUE),
+                        !grepl("eState", `X1`, fixed = TRUE),
+                        !grepl("hasretrofit", `X1`, fixed = TRUE),
+                        !grepl("Constant", `X1`, fixed = TRUE)
+                        ) %>%
+          {.}
+        if (status_code == "") {
+          df <- df %>%
+            dplyr::mutate(`status`=ifelse(grepl("1.private", X1, fixed=TRUE), "private relative to public", "public")) %>%
+            dplyr::mutate(`status`=factor(`status`, levels=c("public", "private relative to public"))) %>%
+            {.}
+        } else {
+          df <- df %>%
+            dplyr::mutate(`status`=status_code) %>%
+            {.}
+        }
+        df <- df %>%
+          dplyr::mutate(`X1`=gsub("1.private#c.", "", `X1`)) %>%
+          dplyr::mutate(`value`=gsub("\\(", "", `value`)) %>%
+          dplyr::mutate(`value`=gsub("\\)", "", `value`)) %>%
+          dplyr::mutate(`value`=gsub("\\*", "", `value`)) %>%
+          dplyr::mutate(`value`=as.numeric(`value`)) %>%
+          ## readr::write_csv("~/Dropbox/thesis/code/pubPriCmp/data-raw/ci_bin.csv")
+          dplyr::bind_rows(df_zero) %>%
+          dplyr::mutate(`X1`=factor(X1, levels=breaklevels)) %>%
+          dplyr::mutate(`ordering`=match(`X1`, breaklevels)) %>%
+          dplyr::mutate_at(vars(model), recode, "X2"="base line", "X3"="state specific trend", "X4"="state trend x private") %>%
+          {.}
+        if (nchar(portfolio) == 1) {
+          df <- df %>%
+            dplyr::filter(`model`=="state trend x private") %>%
+            {.}
+        } else {
+          df <- df %>%
+            dplyr::filter(`model`=="state specific trend") %>%
+            {.}
+        }
+        df <- df %>%
+          dplyr::filter(!(`X1` %in% c("avgTempBelow10", "avgTempAbove90"))) %>%
+          {.}
+        head(df)
+        min(df$value)
+        max(df$value)
+        if (energy_type == "") {
+          if (office.class == "") {
+            shifty = -8
+            yupperlimit = 15
+          }
+          if (ownership == "owned") {
+            if (office.class %in% c("o_o", "o_oct")) {
+              shifty = -30
+              yupperlimit = 40
+            } else if (office.class == "r_o") {
+              shifty = -8
+              yupperlimit = 15
+            } else if (office.class == "ro_oct") {
+              shifty = -8
+              yupperlimit = 15
+            }
+          } else if (ownership == "owned_and_leased") {
+            if (office.class %in% c("o_o", "o_oct")) {
+              shifty = -18
+              yupperlimit = 30
+            } else if (office.class == "r_o") {
+              shifty = -8
+              yupperlimit = 20
+            } else if (office.class == "ro_oct") {
+              shifty = -8
+              yupperlimit = 15
+            }
+          }
+          ## shifty = -25
+          ## yupperlimit = 25
+          scaling = 1 / 1e5 * 1.5
+          ylabel = "Electricity"
+        } else if (energy_type == "_gas") {
+          if (office.class == "") {
+            shifty = -10
+            yupperlimit = 55
+          }
+          if (ownership == "owned") {
+            if (office.class %in% c("o_o", "o_oct")) {
+              shifty = -40
+              yupperlimit = 75
+            } else if (office.class == "r_o") {
+              shifty = -10
+              yupperlimit = 70
+            } else if (office.class == "ro_oct") {
+              shifty = -10
+              yupperlimit = 60
+            }
+          } else if (ownership == "owned_and_leased") {
+            if (office.class %in% c("o_o", "o_oct")) {
+              shifty = -40
+              yupperlimit = 63
+            } else if (office.class == "r_o") {
+              shifty = -10
+              yupperlimit = 60
+            } else if (office.class == "ro_oct") {
+              shifty = -10
+              yupperlimit = 50
+            }
+          }
+          ## shifty = -20
+          ## yupperlimit = 40
+          scaling = 1 / 1e5 * 2
+          ylabel = "Gas"
+        } else if (energy_type == "_total") {
+          if (office.class == "") {
+            shifty = -10
+            yupperlimit = 40
+          }
+          if (ownership == "owned") {
+            if (office.class %in% c("o_o", "o_oct")) {
+              shifty = -30
+              yupperlimit = 60
+            } else if (office.class == "r_o") {
+              shifty = -10
+              yupperlimit = 45
+            } else if (office.class == "ro_oct") {
+              shifty = -10
+              yupperlimit = 40
+            }
+          } else if (ownership == "owned_and_leased") {
+            if (office.class %in% c("o_o", "o_oct")) {
+              shifty = -30
+              yupperlimit = 55
+            } else if (office.class == "r_o") {
+              shifty = -10
+              yupperlimit = 55
+            } else if (office.class == "ro_oct") {
+              shifty = -10
+              yupperlimit = 40
+            }
+          }
+          scaling = 1 / 1e5 * 2
+          ylabel = "Electricity + Gas"
+        }
+        temperatureBinData =
+          allData %>%
+          {.}
+        if (ownership == "owned") {
+          temperatureBinData <- temperatureBinData %>%
+            dplyr::filter(Ownership == "Owned")
+        }
+        if (office.class == "o_o") {
+          generic.office.pnc = "Office"
+          generic.office.gsa = "Office"
+        } else if (office.class == "o_oct") {
+          generic.office.pnc = "Office"
+          generic.office.gsa = c("Courthouse", "Office", "CT/Office")
+        } else if (office.class == "r_o") {
+          generic.office.pnc = "Retail"
+          generic.office.gsa = "Office"
+        } else if (office.class == "ro_oct") {
+          generic.office.pnc = c("Retail", "Office")
+          generic.office.gsa = c("Courthouse", "Office", "CT/Office")
+        }
+        if (office.class != "") {
+          temperatureBinData <- temperatureBinData %>%
+            dplyr::filter((Organization == "PNC" & `type_general` %in% generic.office.pnc) | (Organization == "GSA" & `type_general` %in% generic.office.gsa)) %>%
+            {.}
+        }
+        temperatureBinData <- temperatureBinData %>%
+          dplyr::select(`Organization`, `<10`, starts_with("["), `>90`) %>%
+          tidyr::gather(`tempBin`, `value`, `<10`:`>90`) %>%
+          dplyr::group_by(`Organization`, `tempBin`) %>%
+          dplyr::summarise(count = sum(value)) %>%
+          dplyr::ungroup() %>%
+          dplyr::mutate(`count`=`count` * scaling) %>%
+          dplyr::mutate(`count_start`=shifty, `count_end`=`count` + shifty) %>%
+          dplyr::mutate(`ordering`=match(`tempBin`, breaklabels)) %>%
+          {.}
+        if (status_code == "") {
+          temperatureBinData <- temperatureBinData %>%
+            dplyr::mutate(`status`=ifelse(`Organization`=="GSA", "public", "private relative to public")) %>%
+            dplyr::mutate(`status`=factor(`status`, levels=c("public", "private relative to public"))) %>%
+            dplyr:::select(`count_start`, `count_end`, `ordering`, `status`) %>%
+            {.}
+        } else {
+          temperatureBinData <- temperatureBinData %>%
+            dplyr::mutate(`status`=ifelse(`Organization`=="GSA", "public", "private")) %>%
+            dplyr:::select(`count_start`, `count_end`, `ordering`, `status`) %>%
+            {.}
+        }
+        head(temperatureBinData)
+        ## dplyr::mutate_at(vars(variable), recode, "ci_low"="95% C.I. low end", "ci_high"="95% C.I. high end", "coef"="coefficient") %>%
+        df %>%
+          dplyr::left_join(temperatureBinData, by=c("status", "ordering")) %>%
+          ggplot2::ggplot() +
+          ggplot2::geom_point(ggplot2::aes(x=ordering, y=value)) +
+          ggplot2::geom_line(ggplot2::aes(x=ordering, y=value, linetype=variable)) +
+          scale_linetype_manual(values=c("dashed", "dashed", "solid"), breaks=c("ci_low", NA, "coef"), labels=c("95% C.I.", "", "Coefficient")) +
+          scale_x_continuous(breaks=1:10, labels=breaklabels) +
+          ggplot2::geom_segment(ggplot2::aes(x=`ordering`, xend=`ordering`, y=`count_start`, yend=`count_end`), size=10) +
+          ## ggplot2::geom_bar(mapping=ggplot2::aes(x=`ordering`, y=`count`), stat="identity", data=temperatureBinData) +
+          ggplot2::facet_wrap(`status`~`model`, ncol=1) +
+          ggplot2::xlab("Temperature Bin") +
+          ggplot2::ylab(sprintf("ln(%s in kBtu / gross sqft) * 1000", ylabel)) +
+          ggplot2::coord_cartesian(ylim=c(shifty, yupperlimit)) +
+          ggplot2::theme_bw() +
+          ggplot2::theme(axis.text.x = element_text(angle = 90, hjust = 1),
+                        legend.title=element_blank(), legend.position = "bottom")
+        ggplot2::ggsave(file=sprintf("~/Dropbox/thesis/code/pubPriCmp/image/bin_coef_ci%s%s%s.png", portfolio, energy_type, folder.suffix), width=5, height=5, units="in")
+      }
+    }
+  }
+}
+## ------------------------------------------------------------------------------
+## main analysis plots older version end
+## ------------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------------
+## main analysis plots newer version start
+## ------------------------------------------------------------------------------
+folder.suffixes = c("",
+                    "_o_o_owned", "_o_oct_owned", "_r_o_owned", "_ro_oct_owned",
+                    "_o_o_owned_and_leased", "_o_oct_owned_and_leased", "_r_o_owned_and_leased", "_ro_oct_owned_and_leased"
+                    )
+
+captions = c("no restrictions",
+             "Public: owned offices; Private: owned offices",
+             "Public: owned offices, courthouses, CT/Offices; Private: owned offices",
+             "Public: owned offices; Private: owned retails",
+             "Public: owned offices, courthouses, CT/Offices; Private: owned offices, retails",
+             "Public: offices; Private: offices",
+             "Public: offices, courthouses, CT/Offices; Private: offices",
+             "Public: offices; Private: retails",
+             "Public: offices, courthouses, CT/Offices; Private: offices, retails")
+
+## energy_type = "_total"
 energy_type = ""
-status_code = "private"
-df_zero = data.frame(X1="avgTemp60to70", variable=rep(c("coef", "ci_low", "ci_high"), 2),
-                     model=rep(c(rep("X2", 3), rep("X3", 3)), 2),
-                     value = 0, status=c(rep("private", 6)))
-
-## produce the bin coefficient and CI plot for the model with both portfolio
-df =
-  readr::read_tsv(sprintf("~/Dropbox/thesis/writeups/policy_cmp/tables/regression_results_bin_0720%s%s.txt", tolower(portfolio), energy_type), skip=7, col_names=FALSE) %>%
-## remove bottom non-conformative rows
-  head(-5) %>%
-  dplyr::mutate(`variable`=rep(c("coef", "se", "ci_low", "ci_high"), nrow(.)/4)) %>%
-  tidyr::fill(`X1`) %>%
-  tidyr::unite(`temp`, `X1`, `variable`, sep="-") %>%
-  tidyr::gather(`model`, `value`, starts_with("X")) %>%
-  tidyr::separate(`temp`, c("X1", "variable"), sep="-") %>%
-  dplyr::filter(`variable` != "se",
-                !grepl("0b.", `X1`, fixed = TRUE),
-                !grepl("eDate", `X1`, fixed = TRUE),
-                !grepl("eState", `X1`, fixed = TRUE),
-                !grepl("hasretrofit", `X1`, fixed = TRUE),
-                !grepl("Constant", `X1`, fixed = TRUE)
-                ) %>%
-  {.}
-if (status_code == "") {
-  df <- df %>%
-    dplyr::mutate(`status`=ifelse(grepl("1.private", X1, fixed=TRUE), "private relative to public", "public")) %>%
-    dplyr::mutate(`status`=factor(`status`, levels=c("public", "private relative to public"))) %>%
-    {.}
-} else {
-  df <- df %>%
-    dplyr::mutate(`status`=status_code) %>%
-    {.}
+## energy_type = "_gas"
+for (modelsuffix in c("baseline", "statetrend")) {
+  for (i in seq_along(folder.suffixes)) {
+    s = folder.suffixes[i]
+    print(s)
+    tokens = unlist(strsplit(s, "_"))
+    if (length(tokens) == 0) {
+      ownlease = NA
+      usetype = NA
+    } else {
+      usetype = paste0(tokens[2:3], collapse = "_")
+      if ("leased" %in% tokens) {
+        ownlease = NA
+      } else {
+        ownlease = "Owned"
+      }
+    }
+    filename = sprintf("~/Dropbox/thesis/writeups/policy_cmp/tables/reg_result%s/regression_portfolio_%s%s.txt", s, modelsuffix,
+                      energy_type)
+    fields_to_remove = c(".eDate", "eState", "Constant", "hasretrofitbeforethismonth", "0b.", "1b.eGreeness")
+    fields_to_keep = NULL
+    outreg_vars = c("coef", "se", "ci_low", "ci_high")
+    vars_to_keep = c("coef", "ci_low", "ci_high")
+    df <- read_outreg2(filename=filename, fields_to_remove= fields_to_remove, fields_to_keep= fields_to_keep,
+                      outreg_vars=outreg_vars, vars_to_keep=vars_to_keep)
+    print(head(df))
+    model_info = tibble::tibble(`model_header`=sprintf("X%s", 2:(2 + 1)),
+                            status=c("public", "private"))
+    df_zero = tibble::tibble(X1="avgTemp60to70",
+                            variable=rep(c("coef", "ci_low", "ci_high"), 2),
+                            model=modelsuffix,
+                            value = 0,
+                            status=c(rep("public", 3), rep("private", 3))) %>%
+      {.}
+    df <- df %>%
+      tidyr::gather(`model_header`, `value`, X2:(!!rlang::sym(sprintf("X%s", 2  + 1)))) %>%
+      dplyr::mutate(`value`=gsub("\\(", "", `value`)) %>%
+      dplyr::mutate(`value`=gsub("\\)", "", `value`)) %>%
+      dplyr::mutate(`value`=gsub("\\*", "", `value`)) %>%
+      dplyr::mutate(`value`=as.numeric(`value`)) %>%
+      na.omit() %>%
+      dplyr::left_join(model_info, by="model_header") %>%
+      dplyr::mutate(`model`=modelname) %>%
+      dplyr::bind_rows(df_zero) %>%
+      dplyr::mutate(`ordering`=match(`X1`, breaklevels)) %>%
+      dplyr::select(-`model_header`) %>%
+      {.}
+    dfresult <- df %>%
+      dplyr::filter(!(`X1` %in% c("avgTempBelow10", "avgTempAbove90"))) %>%
+      {.}
+    lower = min(dfresult$value)
+    upper = max(dfresult$value)
+    temperatureBinData = get.study.set(ownlease, usetype)$df
+    temperatureSummary <- temperatureBinData %>%
+      dplyr::select(`Organization`, !!rlang::sym(regioncol), `<10`, starts_with("["), `>90`) %>%
+      tidyr::gather(`tempBin`, `value`, `<10`:`>90`) %>%
+      dplyr::group_by(`Organization`, !!rlang::sym(regioncol), `tempBin`) %>%
+      dplyr::summarise(count = sum(value)) %>%
+      dplyr::ungroup() %>%
+      {.}
+    shifty = (-1)*(upper - lower)/2
+    scaling = abs(shifty) / max(temperatureSummary$count) / 2
+    temperatureToPlot <- temperatureSummary %>%
+      dplyr::mutate(`count`=`count` * scaling) %>%
+      dplyr::mutate(`count_start`=shifty, `count_end`=`count` + shifty) %>%
+      dplyr::mutate(`ordering`=match(`tempBin`, breaklabels)) %>%
+      dplyr::mutate(`status`=ifelse(`Organization`=="GSA", "public", "private")) %>%
+      dplyr::select(`count_start`, `count_end`, `ordering`, `status`, !!rlang::sym(regioncol)) %>%
+      dplyr::rename(Rating = !!rlang::sym(regioncol)) %>%
+      {.}
+    xlabel = "Temperature Bin"
+    if (energy_type == "") {
+      ylabel = "Electricity"
+    } else if (energy_type == "_total") {
+      ylabel = "Electricity + Gas"
+    } else if (energy_type == "_gas") {
+      ylabel = "Gas"
+    }
+    ## facet on public private and greeness level
+    dfresult %>%
+      dplyr::left_join(temperatureToPlot, by=c("ordering", "status")) %>%
+      dplyr::mutate(`status`=factor(`status`, levels=c("public", "private"))) %>%
+      ggplot2::ggplot() +
+      ggplot2::geom_point(ggplot2::aes(x=ordering, y=value)) +
+      ggplot2::geom_line(ggplot2::aes(x=ordering, y=value, linetype=variable)) +
+      scale_linetype_manual(values=c("dashed", "dashed", "solid"), breaks=c("ci_low", NA, "coef"), labels=c("95% C.I.", "", "Coefficient")) +
+      scale_x_continuous(breaks=1:length(breaklabels), labels=breaklabels) +
+      ggplot2::geom_segment(ggplot2::aes(x=`ordering`, xend=`ordering`, y=`count_start`, yend=`count_end`), size=7) +
+      ## for slide
+      ggplot2::facet_wrap(.~`status`) +
+      ## for paper
+      ## ggplot2::facet_wrap(`Rating`~`status`, ncol=2) +
+      ggplot2::xlab(xlabel) +
+      ggplot2::ylab(sprintf("ln(%s in kBtu / gross sqft) * 1000", ylabel)) +
+      ## ggplot2::coord_cartesian(ylim=c(-300, 750)) +
+      ggplot2::labs(title=captions[i],
+                    subtitle=(sprintf("%s model", modelsuffix))) +
+      ggplot2::theme_bw() +
+      ggplot2::theme(axis.text.x = element_text(angle = 90, hjust = 1),
+                    legend.title=element_blank(), legend.position = "bottom")
+    ggplot2::ggsave(file=sprintf("~/Dropbox/thesis/code/pubPriCmp/image/bin_coef_ci_separate_organization_%s_slide%s%s.png",
+                                modelsuffix, energy_type, s), width=8, height=5, units="in")
+  }
 }
-df <- df %>%
-  dplyr::mutate(`X1`=gsub("1.private#c.", "", `X1`)) %>%
-  dplyr::mutate(`value`=gsub("\\(", "", `value`)) %>%
-  dplyr::mutate(`value`=gsub("\\)", "", `value`)) %>%
-  dplyr::mutate(`value`=gsub("\\*", "", `value`)) %>%
-  dplyr::mutate(`value`=as.numeric(`value`)) %>%
-  ## readr::write_csv("~/Dropbox/thesis/code/pubPriCmp/data-raw/ci_bin.csv")
-  dplyr::bind_rows(df_zero) %>%
-  dplyr::mutate(`X1`=factor(X1, levels=breaklevels)) %>%
-  dplyr::mutate(`ordering`=match(`X1`, breaklevels)) %>%
-  dplyr::mutate_at(vars(model), recode, "X2"="base line", "X3"="state specific trend", "X4"="state trend x private") %>%
-  {.}
-if (nchar(portfolio) == 1) {
-  df <- df %>%
-    dplyr::filter(`model`=="state trend x private") %>%
-    {.}
-} else {
-  df <- df %>%
-    dplyr::filter(`model`=="state specific trend") %>%
-    {.}
-}
 
-df <- df %>%
-  dplyr::filter(!(`X1` %in% c("avgTempBelow10", "avgTempAbove90"))) %>%
-  {.}
-
-head(df)
-min(df$value)
-max(df$value)
-
-if (energy_type == "") {
-  shifty = -10
-  yupperlimit = 20
-  ## shifty = -25
-  ## yupperlimit = 25
-  scaling = 1 / 1e5 * 1.5
-  ylabel = "Electricity"
-} else if (energy_type == "_gas") {
-  ## shifty = -50
-  ## yupperlimit = 75
-  shifty = -20
-  yupperlimit = 40
-  scaling = 1 / 1e5 * 5
-  ylabel = "Gas"
-} else if (energy_type == "_total") {
-  shifty = -15
-  yupperlimit = 35
-  scaling = 1 / 1e5 * 2
-  ylabel = "Electricity + Gas"
-}
-temperatureBinData =
-  allData %>%
-  {.}
-temperatureBinData <- temperatureBinData %>%
-  dplyr::select(`Organization`, `<10`, starts_with("["), `>90`) %>%
-  tidyr::gather(`tempBin`, `value`, `<10`:`>90`) %>%
-  dplyr::group_by(`Organization`, `tempBin`) %>%
-  dplyr::summarise(count = sum(value)) %>%
-  dplyr::ungroup() %>%
-  dplyr::mutate(`count`=`count` * scaling) %>%
-  dplyr::mutate(`count_start`=shifty, `count_end`=`count` + shifty) %>%
-  dplyr::mutate(`ordering`=match(`tempBin`, breaklabels)) %>%
-  {.}
-if (status_code == "") {
-  temperatureBinData <- temperatureBinData %>%
-    dplyr::mutate(`status`=ifelse(`Organization`=="GSA", "public", "private relative to public")) %>%
-    dplyr::mutate(`status`=factor(`status`, levels=c("public", "private relative to public"))) %>%
-    dplyr:::select(`count_start`, `count_end`, `ordering`, `status`) %>%
-    {.}
-} else {
-  temperatureBinData <- temperatureBinData %>%
-    dplyr::mutate(`status`=ifelse(`Organization`=="GSA", "public", "private")) %>%
-    dplyr:::select(`count_start`, `count_end`, `ordering`, `status`) %>%
-    {.}
-}
-head(temperatureBinData)
-
-## dplyr::mutate_at(vars(variable), recode, "ci_low"="95% C.I. low end", "ci_high"="95% C.I. high end", "coef"="coefficient") %>%
-df %>%
-  dplyr::left_join(temperatureBinData, by=c("status", "ordering")) %>%
-  ggplot2::ggplot() +
-  ggplot2::geom_point(ggplot2::aes(x=ordering, y=value)) +
-  ggplot2::geom_line(ggplot2::aes(x=ordering, y=value, linetype=variable)) +
-  scale_linetype_manual(values=c("dashed", "dashed", "solid"), breaks=c("ci_low", NA, "coef"), labels=c("95% C.I.", "", "Coefficient")) +
-  scale_x_continuous(breaks=1:10, labels=breaklabels) +
-  ggplot2::geom_segment(ggplot2::aes(x=`ordering`, xend=`ordering`, y=`count_start`, yend=`count_end`), size=10) +
-  ## ggplot2::geom_bar(mapping=ggplot2::aes(x=`ordering`, y=`count`), stat="identity", data=temperatureBinData) +
-  ggplot2::facet_wrap(`status`~`model`, ncol=1) +
-  ggplot2::xlab("Temperature Bin") +
-  ggplot2::ylab(sprintf("ln(%s in kBtu / gross sqft) * 1000", ylabel)) +
-  ggplot2::coord_cartesian(ylim=c(shifty, yupperlimit)) +
-  ggplot2::theme_bw() +
-  ggplot2::theme(axis.text.x = element_text(angle = 90, hjust = 1),
-                legend.title=element_blank(), legend.position = "bottom")
-ggplot2::ggsave(file=sprintf("~/Dropbox/thesis/code/pubPriCmp/image/bin_coef_ci%s%s.png", portfolio, energy_type),
-                width=5, height=5, units="in")
+## ------------------------------------------------------------------------------
+## main analysis plots newer version start
+## ------------------------------------------------------------------------------
 
 breaklevels = c("hdd", "hdd2", "cdd", "cdd2")
 breaklabels = c("HDD", "HDD2", "CDD", "CDD2")
@@ -1135,157 +1392,210 @@ breaklabels = c("<10", "[10-20)", "[20-30)", "[30-40)",
 ## green_levels = c("Least Green", "Moderate Green", "Most Green")
 green_levels = c("Least Green", "Most Green")
 len_green_levels = length(green_levels)
-
-## green_levels = c("Least Green", "Most Green")
 ## energy_type = "_gas"
-modelsuffix = "baseline"
-modelname = "baseline"
+## modelsuffix = "baseline"
+## modelname = "baseline"
 ## energy_type = "_gas"
 energy_type = "_total"
-## modelsuffix = "statetrend"
-## modelname = "state specific trend"
-filename = sprintf("~/Dropbox/thesis/writeups/policy_cmp/tables/regression_greeness_%s%s.txt", modelsuffix,
-                   energy_type)
-fields_to_remove = c(".eDate", "eState", "Constant", "hasretrofitbeforethismonth", "0b.", "1b.eGreeness")
-fields_to_keep = NULL
-outreg_vars = c("coef", "se", "ci_low", "ci_high")
-vars_to_keep = c("coef", "ci_low", "ci_high")
-df <- read_outreg2(filename=filename, fields_to_remove= fields_to_remove, fields_to_keep= fields_to_keep,
-                   outreg_vars=outreg_vars, vars_to_keep=vars_to_keep)
-head(df)
+modelsuffix = "statetrend"
+modelname = "state specific trend"
 
-model_info = data.frame(`model_header`=sprintf("X%s", 2:(2*len_green_levels + 1)),
-                        status=c(rep("public", len_green_levels), rep("private", len_green_levels)),
-                        Rating=rep(green_levels, 2))
+## regioncol = "Greeness"
+## filenamesuffix = ""
+## green.source = "Majority Vote"
+## regioncol = "greeness.howe.state"
+## filenamesuffix = "_howestate"
+## green.source = "State Data from Howe 2015"
+regioncol = "greeness.howe.county"
+filenamesuffix = "_howecounty"
+green.source = "County Data from Howe 2015"
 
-df_zero = data.frame(X1="avgTemp60to70", variable=rep(c("coef", "ci_low", "ci_high"), 2 * len_green_levels),
-                     model=modelname,
-                     Rating=rep(sort(rep(green_levels, 3)), 2),
-                     value = 0, status=c(rep("public", 3 * len_green_levels), rep("private", 3 * len_green_levels)))
-nrow(df_zero)
+folder.suffixes = c("",
+                    "_o_o_owned", "_o_oct_owned", "_r_o_owned", "_ro_oct_owned",
+                    "_o_o_owned_and_leased", "_o_oct_owned_and_leased", "_r_o_owned_and_leased", "_ro_oct_owned_and_leased"
+                    )
 
-df <-
-  df %>%
-  tidyr::gather(`model_header`, `value`, X2:(!!rlang::sym(sprintf("X%s", 2 * len_green_levels + 1)))) %>%
-  dplyr::mutate(`value`=gsub("\\(", "", `value`)) %>%
-  dplyr::mutate(`value`=gsub("\\)", "", `value`)) %>%
-  dplyr::mutate(`value`=gsub("\\*", "", `value`)) %>%
-  dplyr::mutate(`value`=as.numeric(`value`)) %>%
-  na.omit() %>%
-  dplyr::left_join(model_info, by="model_header") %>%
-  dplyr::bind_rows(df_zero) %>%
-  dplyr::mutate(`ordering`=match(`X1`, breaklevels)) %>%
-  dplyr::mutate(`model`=modelname) %>%
-  {.}
+captions = c("no restrictions",
+             "Public: owned offices; Private: owned offices",
+             "Public: owned offices, courthouses, CT/Offices; Private: owned offices",
+             "Public: owned offices; Private: owned retails",
+             "Public: owned offices, courthouses, CT/Offices; Private: owned offices, retails",
+             "Public: offices; Private: offices",
+             "Public: offices, courthouses, CT/Offices; Private: offices",
+             "Public: offices; Private: retails",
+             "Public: offices, courthouses, CT/Offices; Private: offices, retails")
 
-df <- df %>%
-  dplyr::filter(!(`X1` %in% c("avgTempBelow10", "avgTempAbove90"))) %>%
-  {.}
-
-min(df$value)
-max(df$value)
-
-if (energy_type == "") {
-  shifty = -45
-  yupperlimit = 25
-  scaling = 1 / 1e4 * 1.5
-  ylabel = "Electricity"
-} else if (energy_type == "_gas") {
-  shifty = -45
-  yupperlimit = 240
-  scaling = 1 / 1e4 * 1.5
-  ylabel = "Gas"
-} else if (energy_type == "_total") {
-  shifty = -5
-  yupperlimit = 40
-  scaling = 1 / 1e5 * 1.5
-  ylabel = "Electricity + Gas"
-}
-
-temperatureBinData =
-  allDataGreen %>%
-  {.}
-temperatureBinData <-
-  temperatureBinData %>%
-  dplyr::select(`Organization`, `Greeness`, `<10`, starts_with("["), `>90`) %>%
-  tidyr::gather(`tempBin`, `value`, `<10`:`>90`) %>%
-  dplyr::group_by(`Organization`, `Greeness`, `tempBin`) %>%
-  dplyr::summarise(count = sum(value)) %>%
-  dplyr::ungroup() %>%
-  dplyr::mutate(`count`=`count` * scaling) %>%
-  dplyr::mutate(`count_start`=shifty, `count_end`=`count` + shifty) %>%
-  dplyr::mutate(`ordering`=match(`tempBin`, breaklabels)) %>%
-  dplyr::mutate(`status`=ifelse(`Organization`=="GSA", "public", "private")) %>%
-  dplyr::select(`count_start`, `count_end`, `ordering`, `status`, `Greeness`) %>%
-  dplyr::rename(`Rating`=`Greeness`) %>%
-  {.}
+for (i in seq_along(folder.suffixes)) {
+  s = folder.suffixes[i]
+  print(s)
+  tokens = unlist(strsplit(s, "_"))
+  if (length(tokens) == 0) {
+    ownlease = NA
+    usetype = NA
+  } else {
+    usetype = paste0(tokens[2:3], collapse = "_")
+    if ("leased" %in% tokens) {
+      ownlease = NA
+    } else {
+      ownlease = "Owned"
+    }
+  }
+  filename = sprintf("~/Dropbox/thesis/writeups/policy_cmp/tables/reg_result%s/regression_greeness_%s%s%s.txt", s, modelsuffix,
+                    energy_type, filenamesuffix)
+  fields_to_remove = c(".eDate", "eState", "Constant", "hasretrofitbeforethismonth", "0b.", "1b.eGreeness")
+  fields_to_keep = NULL
+  outreg_vars = c("coef", "se", "ci_low", "ci_high")
+  vars_to_keep = c("coef", "ci_low", "ci_high")
+  df <- read_outreg2(filename=filename, fields_to_remove= fields_to_remove, fields_to_keep= fields_to_keep,
+                    outreg_vars=outreg_vars, vars_to_keep=vars_to_keep)
+  head(df)
+  model_info = tibble::tibble(`model_header`=sprintf("X%s", 2:(2*len_green_levels + 1)),
+                          status=c(rep("public", len_green_levels), rep("private", len_green_levels)),
+                          Rating=rep(green_levels, 2))
+  df_zero = tibble::tibble(X1="avgTemp60to70",
+                           variable=rep(c("coef", "ci_low", "ci_high"), 2 * len_green_levels),
+                           model=modelname,
+                           Rating=rep(sort(rep(green_levels, 3)), 2), value = 0,
+                           status=c(rep("public", 3 * len_green_levels), rep("private", 3 * len_green_levels))) %>%
+    {.}
+  df <- df %>%
+    tidyr::gather(`model_header`, `value`, X2:(!!rlang::sym(sprintf("X%s", 2 * len_green_levels + 1)))) %>%
+    dplyr::mutate(`value`=gsub("\\(", "", `value`)) %>%
+    dplyr::mutate(`value`=gsub("\\)", "", `value`)) %>%
+    dplyr::mutate(`value`=gsub("\\*", "", `value`)) %>%
+    dplyr::mutate(`value`=as.numeric(`value`)) %>%
+    na.omit() %>%
+    dplyr::left_join(model_info, by="model_header") %>%
+    dplyr::mutate(`model`=modelname) %>%
+    dplyr::bind_rows(df_zero) %>%
+    dplyr::mutate(`ordering`=match(`X1`, breaklevels)) %>%
+    dplyr::select(-`model_header`) %>%
+    {.}
+  dfresult <- df %>%
+    dplyr::filter(!(`X1` %in% c("avgTempBelow10", "avgTempAbove90"))) %>%
+    {.}
+  lower = min(dfresult$value)
+  upper = max(dfresult$value)
+  temperatureBinData = get.study.set(ownlease, usetype)$df
+  temperatureSummary <- temperatureBinData %>%
+    dplyr::select(`Organization`, !!rlang::sym(regioncol), `<10`, starts_with("["), `>90`) %>%
+    tidyr::gather(`tempBin`, `value`, `<10`:`>90`) %>%
+    dplyr::group_by(`Organization`, !!rlang::sym(regioncol), `tempBin`) %>%
+    dplyr::summarise(count = sum(value)) %>%
+    dplyr::ungroup() %>%
+    {.}
+  shifty = (-1)*(upper - lower)/2
+  scaling = abs(shifty) / max(temperatureSummary$count) / 2
+  temperatureToPlot <- temperatureSummary %>%
+    dplyr::mutate(`count`=`count` * scaling) %>%
+    dplyr::mutate(`count_start`=shifty, `count_end`=`count` + shifty) %>%
+    dplyr::mutate(`ordering`=match(`tempBin`, breaklabels)) %>%
+    dplyr::mutate(`status`=ifelse(`Organization`=="GSA", "public", "private")) %>%
+    dplyr::select(`count_start`, `count_end`, `ordering`, `status`, !!rlang::sym(regioncol)) %>%
+    dplyr::rename(Rating = !!rlang::sym(regioncol)) %>%
+    {.}
+## if (energy_type == "") {
+##   shifty = -45
+##   yupperlimit = 25
+##   scaling = 1 / 1e4 * 1.5
+##   ylabel = "Electricity"
+## } else if (energy_type == "_gas") {
+##   shifty = -45
+##   yupperlimit = 240
+##   scaling = 1 / 1e4 * 1.5
+##   ylabel = "Gas"
+## } else if (energy_type == "_total") {
+##   shifty = -5
+##   yupperlimit = 40
+##   scaling = 1 / 1e5 * 1.5
+##   ylabel = "Electricity + Gas"
+## }
+## temperatureBinData =
+##   allDataGreen %>%
+##   {.}
+## temperatureBinData <-
+##   temperatureBinData %>%
+##   dplyr::select(`Organization`, `Greeness`, `<10`, starts_with("["), `>90`) %>%
+##   tidyr::gather(`tempBin`, `value`, `<10`:`>90`) %>%
+##   dplyr::group_by(`Organization`, `Greeness`, `tempBin`) %>%
+##   dplyr::summarise(count = sum(value)) %>%
+##   dplyr::ungroup() %>%
+##   dplyr::mutate(`count`=`count` * scaling) %>%
+##   dplyr::mutate(`count_start`=shifty, `count_end`=`count` + shifty) %>%
+##   dplyr::mutate(`ordering`=match(`tempBin`, breaklabels)) %>%
+##   dplyr::mutate(`status`=ifelse(`Organization`=="GSA", "public", "private")) %>%
+##   dplyr::select(`count_start`, `count_end`, `ordering`, `status`, `Greeness`) %>%
+##   dplyr::rename(`Rating`=`Greeness`) %>%
+##   {.}
 ## head(temperatureBinData)
 ## head(df)
-
-xlabel = "Temperature Bin"
-## facet on public private and greeness level
-df %>%
-  dplyr::left_join(temperatureBinData, by=c("ordering", "status", "Rating")) %>%
-  dplyr::mutate(`status`=factor(`status`, levels=c("public", "private"))) %>%
-  ggplot2::ggplot() +
-  ggplot2::geom_point(ggplot2::aes(x=ordering, y=value)) +
-  ggplot2::geom_line(ggplot2::aes(x=ordering, y=value, linetype=variable)) +
-  scale_linetype_manual(values=c("dashed", "dashed", "solid"), breaks=c("ci_low", NA, "coef"), labels=c("95% C.I.", "", "Coefficient")) +
-  scale_x_continuous(breaks=1:length(breaklabels), labels=breaklabels) +
-  ggplot2::geom_segment(ggplot2::aes(x=`ordering`, xend=`ordering`, y=`count_start`, yend=`count_end`), size=7) +
-  ## for slide
-  ggplot2::facet_wrap(`status`~`Rating`, ncol=len_green_levels) +
-  ## for paper
-  ## ggplot2::facet_wrap(`Rating`~`status`, ncol=2) +
-  ggplot2::xlab(xlabel) +
-  ggplot2::ylab(sprintf("ln(%s in kBtu / gross sqft) * 1000", ylabel)) +
-  ## ggplot2::coord_cartesian(ylim=c(-300, 750)) +
-  ggplot2::theme_bw() +
-  ggplot2::theme(axis.text.x = element_text(angle = 90, hjust = 1),
-                legend.title=element_blank(), legend.position = "bottom")
-ggplot2::ggsave(file=sprintf("~/Dropbox/thesis/code/pubPriCmp/image/bin_coef_ci_greeness_separate_organization_greeness_%s_slide%s.png", modelsuffix, energy_type), width=8, height=5, units="in")
-## ggplot2::ggsave(file=sprintf("~/Dropbox/thesis/code/pubPriCmp/image/bin_coef_ci_greeness_separate_organization_greeness_%s.png", modelsuffix), width=6, height=7, units="in")
-
-
-## facet on public private and fill on greeness level
-to_plot <- df %>%
-  dplyr::left_join(temperatureBinData, by=c("ordering", "status", "Rating")) %>%
-  dplyr::mutate(`status`=factor(`status`, levels=c("public", "private"))) %>%
-  {.}
-to_plot_least <- to_plot %>%
-  dplyr::filter(`Rating`=="Least Green") %>%
-  {.}
-to_plot_most <- to_plot %>%
-  dplyr::filter(`Rating`=="Most Green") %>%
-  {.}
-
-binsize = 4
-jitterAmount = 0.15
-xlabel = "Temperature Bin"
-## facet on public private and greeness level
-to_plot %>%
-  ggplot2::ggplot() +
-  ggplot2::geom_point(ggplot2::aes(x=ordering, y=value, color=Rating)) +
-  ggplot2::geom_line(ggplot2::aes(x=ordering, y=value, linetype=variable, color=Rating)) +
-  scale_linetype_manual(values=c("dashed", "dashed", "solid"), breaks=c("ci_low", NA, "coef"), labels=c("95% C.I.", "", "Coefficient")) +
-  scale_x_continuous(breaks=1:length(breaklabels), labels=breaklabels) +
-  ## ggplot2::geom_segment(ggplot2::aes(x=`ordering`, xend=`ordering`, y=`count_start`, yend=`count_end`), size=7) +
-  ggplot2::geom_segment(ggplot2::aes(x=`ordering`-jitterAmount, xend=`ordering`-jitterAmount, y=`count_start`, yend=`count_end`, group=`Rating`, color=`Rating`), data=to_plot_least, size=binsize) +
-  ggplot2::geom_segment(ggplot2::aes(x=`ordering`+jitterAmount, xend=`ordering`+jitterAmount, y=`count_start`, yend=`count_end`, group=`status`, color=`Rating`), data=to_plot_most, size=binsize) +
-  ## for slide
-  ggplot2::facet_wrap(.~`status`, ncol=2) +
-  ## for paper
-  ## ggplot2::facet_wrap(`Rating`~`status`, ncol=2) +
-  ggplot2::xlab(xlabel) +
-  ggplot2::ylab(sprintf("ln(%s in kBtu / gross sqft) * 1000", ylabel)) +
-  ## ggplot2::coord_cartesian(ylim=c(-300, 750)) +
-  ggplot2::theme_bw() +
-  ggplot2::scale_color_manual(values=c("#A1D99B", "#31A354")) +
-  ggplot2::theme(axis.text.x = element_text(angle = 90, hjust = 1),
-                legend.title=element_blank(), legend.position = "bottom")
-ggplot2::ggsave(file=sprintf("~/Dropbox/thesis/code/pubPriCmp/image/facet_pubpri_bin_coef_ci_greeness_separate_organization_greeness_%s_slide%s.png", modelsuffix, energy_type), width=8, height=5, units="in")
-## ggplot2::ggsave(file=sprintf("~/Dropbox/thesis/code/pubPriCmp/image/bin_coef_ci_greeness_separate_organization_greeness_%s.png", modelsuffix), width=6, height=7, units="in")
-
+  xlabel = "Temperature Bin"
+  ylabel = "Electricity + Gas"
+  ## facet on public private and greeness level
+  dfresult %>%
+    dplyr::left_join(temperatureToPlot, by=c("ordering", "status", "Rating")) %>%
+    dplyr::mutate(`status`=factor(`status`, levels=c("public", "private"))) %>%
+    ggplot2::ggplot() +
+    ggplot2::geom_point(ggplot2::aes(x=ordering, y=value)) +
+    ggplot2::geom_line(ggplot2::aes(x=ordering, y=value, linetype=variable)) +
+    scale_linetype_manual(values=c("dashed", "dashed", "solid"), breaks=c("ci_low", NA, "coef"), labels=c("95% C.I.", "", "Coefficient")) +
+    scale_x_continuous(breaks=1:length(breaklabels), labels=breaklabels) +
+    ggplot2::geom_segment(ggplot2::aes(x=`ordering`, xend=`ordering`, y=`count_start`, yend=`count_end`), size=7) +
+    ## for slide
+    ggplot2::facet_wrap(`status`~`Rating`, ncol=len_green_levels) +
+    ## for paper
+    ## ggplot2::facet_wrap(`Rating`~`status`, ncol=2) +
+    ggplot2::xlab(xlabel) +
+    ggplot2::ylab(sprintf("ln(%s in kBtu / gross sqft) * 1000", ylabel)) +
+    ## ggplot2::coord_cartesian(ylim=c(-300, 750)) +
+    ggplot2::labs(title=captions[i],
+                  subtitle=(sprintf("%s model (greeness source: %s)", modelsuffix, green.source))) +
+    ggplot2::theme_bw() +
+    ggplot2::theme(axis.text.x = element_text(angle = 90, hjust = 1),
+                  legend.title=element_blank(), legend.position = "bottom")
+  ggplot2::ggsave(file=sprintf("~/Dropbox/thesis/code/pubPriCmp/image/bin_coef_ci_greeness%s_separate_organization_%s_slide%s%s.png",
+                               filenamesuffix, modelsuffix, energy_type, s), width=8, height=5, units="in")
+  ## ggplot2::ggsave(file=sprintf("~/Dropbox/thesis/code/pubPriCmp/image/bin_coef_ci_greeness_separate_organization_greeness_%s.png", modelsuffix), width=6, height=7, units="in")
+  ## facet on public private and fill on greeness level
+  to_plot <- dfresult %>%
+    dplyr::left_join(temperatureToPlot, by=c("ordering", "status", "Rating")) %>%
+    dplyr::mutate(`status`=factor(`status`, levels=c("public", "private"))) %>%
+    {.}
+  to_plot_least <- to_plot %>%
+    dplyr::filter(`Rating`=="Least Green") %>%
+    {.}
+  to_plot_most <- to_plot %>%
+    dplyr::filter(`Rating`=="Most Green") %>%
+    {.}
+  binsize = 4
+  jitterAmount = 0.15
+  xlabel = "Temperature Bin"
+  ## facet on public private and greeness level
+  to_plot %>%
+    ggplot2::ggplot() +
+    ggplot2::geom_point(ggplot2::aes(x=ordering, y=value, color=Rating)) +
+    ggplot2::geom_line(ggplot2::aes(x=ordering, y=value, linetype=variable, color=Rating)) +
+    scale_linetype_manual(values=c("dashed", "dashed", "solid"), breaks=c("ci_low", NA, "coef"), labels=c("95% C.I.", "", "Coefficient")) +
+    scale_x_continuous(breaks=1:length(breaklabels), labels=breaklabels) +
+    ## ggplot2::geom_segment(ggplot2::aes(x=`ordering`, xend=`ordering`, y=`count_start`, yend=`count_end`), size=7) +
+    ggplot2::geom_segment(ggplot2::aes(x=`ordering`-jitterAmount, xend=`ordering`-jitterAmount, y=`count_start`, yend=`count_end`, group=`Rating`, color=`Rating`), data=to_plot_least, size=binsize) +
+    ggplot2::geom_segment(ggplot2::aes(x=`ordering`+jitterAmount, xend=`ordering`+jitterAmount, y=`count_start`, yend=`count_end`, group=`status`, color=`Rating`), data=to_plot_most, size=binsize) +
+    ## for slide
+    ggplot2::facet_wrap(.~`status`, ncol=2) +
+    ## for paper
+    ## ggplot2::facet_wrap(`Rating`~`status`, ncol=2) +
+    ggplot2::xlab(xlabel) +
+    ggplot2::ylab(sprintf("ln(%s in kBtu / gross sqft) * 1000", ylabel)) +
+    ## ggplot2::coord_cartesian(ylim=c(-300, 750)) +
+    ggplot2::theme_bw() +
+    ggplot2::labs(title=captions[i],
+                  subtitle=(sprintf("%s model (greeness source: %s)", modelsuffix, green.source))) +
+    ggplot2::scale_color_manual(values=c("#A1D99B", "#31A354")) +
+    ggplot2::theme(axis.text.x = element_text(angle = 90, hjust = 1),
+                  legend.title=element_blank(), legend.position = "bottom")
+  ggplot2::ggsave(file=sprintf("~/Dropbox/thesis/code/pubPriCmp/image/facet_pubpri_bin_coef_ci_greeness%s_separate_organization_%s_slide%s%s.png", filenamesuffix, modelsuffix, energy_type, s), width=8, height=5, units="in")
+  ## ggplot2::ggsave(file=sprintf("~/Dropbox/thesis/code/pubPriCmp/image/bin_coef_ci_greeness_separate_organization_greeness_%s.png", modelsuffix), width=6, height=7, units="in")
+}
 
 allDataGreen %>%
   distinct(Organization, Greeness, Name) %>%
@@ -1299,15 +1609,17 @@ breaklevels = c("avgTempBelow10", "avgTemp10to20", "avgTemp20to30", "avgTemp30to
 breaklabels = c("<10", "[10-20)", "[20-30)", "[30-40)",
                 "[40-50)", "[50-60)", "[60-70)", "[70-80)", "[80-90)",
                 ">90")
+
 modelname = "baseline"
 xlabel = "Temperature Bin"
-process_climate_result <- function(modelname, modellabel, energy_type, region_keyword) {
+
+process_climate_result <- function(modelname, modellabel, energy_type, region_keyword, folder_suffix) {
 ## produce the bin model coefficient and CI plot for greeness analysis for the model for just one portfolio
   df_recode_xi =
     readr::read_csv(sprintf("~/Dropbox/thesis/code/pubPriCmp/data-raw/header_to_%s_owner.csv", region_keyword)) %>%
     {.}
-  filename = sprintf("~/Dropbox/thesis/writeups/policy_cmp/tables/regression_%s_%s%s.txt", region_keyword, modelname,
-                     energy_type)
+  filename = sprintf("~/Dropbox/thesis/writeups/policy_cmp/tables/reg_result%s/regression_%s_%s%s.txt",
+                     folder_suffix, region_keyword, modelname, energy_type)
   print(filename)
   fields_to_remove = c("0b.", "eDate", "eState", "hasretrofit", "Constant", "o.avgTempBelow10")
   fields_to_keep = NULL
@@ -1336,6 +1648,7 @@ process_climate_result <- function(modelname, modellabel, energy_type, region_ke
   ##                 ) %>%
   df_zero = data.frame(X1="avgTemp60to70", variable=rep(c("coef", "ci_low", "ci_high"), 8),
                        header=sprintf("X%s", sort(rep(2:(length(unique(df_recode_xi$header)) + 1), 3))), value=0)
+  print(df_zero, n=Inf)
   df_model <- df_model %>%
     tidyr::unite(`temp`, `X1`, `variable`, sep="-") %>%
     tidyr::gather(`header`, `value`, starts_with("X")) %>%
@@ -1370,168 +1683,258 @@ region_keyword = "region_wiki"
 ## regioncol = "USRegion"
 regioncol = "region_wiki"
 ## modelname = "statetrend"
-modelname = "baseline"
-dfresult =
-  process_climate_result(modelname=modelname, modellabel="baseline", energy_type=energy_type,
-                         region_keyword=region_keyword) %>%
-  ## dplyr::bind_rows(process_climate_result(modelname="statetrend", modellabel="state specific trend",
-  ##                                         energy_type=energy_type,
-  ##                        region_keyword=region_keyword)) %>%
-  {.}
+## modelname = "baseline"
+modelname = "both"
 
-## remove 10F and 90F bins
-dfresult <- dfresult %>%
-  dplyr::filter(!(`X1` %in% c("avgTempBelow10", "avgTempAbove90"))) %>%
-  {.}
+folder.suffixes = c("",
+                    "_o_o_owned", "_o_oct_owned", "_r_o_owned", "_ro_oct_owned",
+                    "_o_o_owned_and_leased", "_o_oct_owned_and_leased", "_r_o_owned_and_leased", "_ro_oct_owned_and_leased"
+                    )
 
-head(dfresult)
-min(dfresult$value)
-max(dfresult$value)
+captions = c("no restrictions",
+             "Public: owned offices; Private: owned offices",
+             "Public: owned offices, courthouses, CT/Offices; Private: owned offices",
+             "Public: owned offices; Private: owned retails",
+             "Public: owned offices, courthouses, CT/Offices; Private: owned offices, retails",
+             "Public: offices; Private: offices",
+             "Public: offices, courthouses, CT/Offices; Private: offices",
+             "Public: offices; Private: retails",
+             "Public: offices, courthouses, CT/Offices; Private: offices, retails")
 
-(dfresult) %>%
-  distinct(!!rlang::sym(regioncol), `status`, `model`)
+for (i in seq_along(folder.suffixes)) {
 
-if (energy_type == "") {
-  shifty=-400
-  yupperlimit = 750
-  scaling = 1 / 1e3 * 1.5
-} else if (energy_type == "_gas") {
-  shifty=-900
-  yupperlimit = 900
-  scaling = 1 / 1e3 * 1.5
-} else if (energy_type == "_total") {
-  ## shifty=-130
-  ## yupperlimit = 220
-  ## scaling = 1 / 1e4 * 4
-  shifty=-50
-  yupperlimit = 80
-  scaling = 1 / 1e4 * 1.5
-}
-temperatureBinData =
-  allData %>%
-  {.}
-temperatureBinData <-
-  temperatureBinData %>%
-  dplyr::select(`Organization`, !!rlang::sym(regioncol), `<10`, starts_with("["), `>90`) %>%
-  tidyr::gather(`tempBin`, `value`, `<10`:`>90`) %>%
-  dplyr::group_by(`Organization`, !!rlang::sym(regioncol), `tempBin`) %>%
-  dplyr::summarise(count = sum(value)) %>%
-  dplyr::ungroup() %>%
-  dplyr::mutate(`count`=`count` * scaling) %>%
-  dplyr::mutate(`count_start`=shifty, `count_end`=`count` + shifty) %>%
-  dplyr::mutate(`ordering`=match(`tempBin`, breaklabels)) %>%
-  dplyr::mutate(`status`=ifelse(`Organization`=="GSA", "public", "private")) %>%
-  dplyr::select(`count_start`, `count_end`, `ordering`, `status`, !!rlang::sym(regioncol)) %>%
-  {.}
+  i = 1
+  s = folder.suffixes[i]
+  print(s)
+  tokens = unlist(strsplit(s, "_"))
+  if (length(tokens) == 0) {
+    ownlease = NA
+    usetype = NA
+  } else {
+    usetype = paste0(tokens[2:3], collapse = "_")
+    if ("leased" %in% tokens) {
+      ownlease = NA
+    } else {
+      ownlease = "Owned"
+    }
+  }
 
-head(temperatureBinData)
-
-to_plot <- dfresult %>%
-  dplyr::left_join(temperatureBinData, by=c("ordering", "status", regioncol)) %>%
-  dplyr::mutate(`status`=factor(`status`, levels=c("public", "private"))) %>%
-  {.}
-to_plot_public <- to_plot %>%
-  dplyr::filter(`status`=="public") %>%
-  {.}
-to_plot_private <- to_plot %>%
-  dplyr::filter(`status`=="private") %>%
-  {.}
-to_plot_north <- to_plot %>%
-  dplyr::filter(!!rlang::sym(regioncol)=="North") %>%
-  {.}
-to_plot_south <- to_plot %>%
-  dplyr::filter(!!rlang::sym(regioncol)=="South") %>%
-  {.}
-
-## for paper
-## binsize = 4
-## jitterAmount = 0.3
-## for slides
-binsize = 1.7
-jitterAmount = 0.15
-if (energy_type == "_total") {
-  binsize = 3.4
-  jitterAmount = 0.17
-}
-
-## facet by portfolio
-p <- to_plot %>%
-  ggplot2::ggplot() +
-  ggplot2::geom_point(ggplot2::aes(x=ordering, y=value, color=!!rlang::sym(regioncol)), size=0.7) +
-  ggplot2::geom_line(ggplot2::aes(x=ordering, y=value, linetype=variable, color=!!rlang::sym(regioncol))) +
-  scale_linetype_manual(values=c("dashed", "dashed", "solid"), breaks=c("ci_low", NA, "coef"), labels=c("95% C.I.", "", "Coefficient")) +
-  scale_x_continuous(breaks=1:length(breaklabels), labels=breaklabels) +
-  ggplot2::geom_segment(ggplot2::aes(x=`ordering`-jitterAmount, xend=`ordering`-jitterAmount, y=`count_start`, yend=`count_end`, group=!!rlang::sym(regioncol), color=!!rlang::sym(regioncol)), data=to_plot_north, size=binsize) +
-  ggplot2::geom_segment(ggplot2::aes(x=`ordering`+jitterAmount, xend=`ordering`+jitterAmount, y=`count_start`, yend=`count_end`, group=!!rlang::sym(regioncol), color=!!rlang::sym(regioncol)), data=to_plot_south, size=binsize) +
+  dfresult =
+    process_climate_result(modelname="baseline", modellabel="baseline", energy_type=energy_type,
+                          region_keyword=region_keyword, s) %>%
+    dplyr::bind_rows(process_climate_result(modelname="statetrend", modellabel="state specific trend",
+                                            energy_type=energy_type,
+                          region_keyword=region_keyword, s)) %>%
+    {.}
+  ## remove 10F and 90F bins
+  dfresult <- dfresult %>%
+    dplyr::filter(!(`X1` %in% c("avgTempBelow10", "avgTempAbove90"))) %>%
+    {.}
+  ## head(dfresult)
+  lower = min(dfresult$value)
+  upper = max(dfresult$value)
+  ## (dfresult) %>%
+  ##   distinct(!!rlang::sym(regioncol), `status`, `model`)
+  ## if (energy_type == "") {
+  ##   shifty=-400
+  ##   yupperlimit = 750
+  ##   scaling = 1 / 1e3 * 1.5
+  ## } else if (energy_type == "_gas") {
+  ##   shifty=-900
+  ##   yupperlimit = 900
+  ##   scaling = 1 / 1e3 * 1.5
+  ## } else if (energy_type == "_total") {
+  ##   ## shifty=-130
+  ##   ## yupperlimit = 220
+  ##   ## scaling = 1 / 1e4 * 4
+  ##   shifty=-50
+  ##   yupperlimit = 80
+  ##   scaling = 1 / 1e4 * 1.5
+  ## }
+  temperatureBinData = get.study.set(ownlease, usetype)$df
+  temperatureSummary <- temperatureBinData %>%
+    dplyr::select(`Organization`, !!rlang::sym(regioncol), `<10`, starts_with("["), `>90`) %>%
+    tidyr::gather(`tempBin`, `value`, `<10`:`>90`) %>%
+    dplyr::group_by(`Organization`, !!rlang::sym(regioncol), `tempBin`) %>%
+    dplyr::summarise(count = sum(value)) %>%
+    dplyr::ungroup() %>%
+    {.}
+  shifty = (-1)*(upper - lower)/2
+  scaling = abs(shifty) / max(temperatureSummary$count) / 2
+  temperatureToPlot <- temperatureSummary %>%
+    dplyr::mutate(`count`=`count` * scaling) %>%
+    dplyr::mutate(`count_start`=shifty, `count_end`=`count` + shifty) %>%
+    dplyr::mutate(`ordering`=match(`tempBin`, breaklabels)) %>%
+    dplyr::mutate(`status`=ifelse(`Organization`=="GSA", "public", "private")) %>%
+    dplyr::select(`count_start`, `count_end`, `ordering`, `status`, !!rlang::sym(regioncol)) %>%
+    {.}
+  head(temperatureToPlot)
+  to_plot <- dfresult %>%
+    dplyr::left_join(temperatureToPlot, by=c("ordering", "status", regioncol)) %>%
+    dplyr::mutate(`status`=factor(`status`, levels=c("public", "private"))) %>%
+    {.}
+  to_plot_public <- to_plot %>%
+    dplyr::filter(`status`=="public") %>%
+    {.}
+  to_plot_private <- to_plot %>%
+    dplyr::filter(`status`=="private") %>%
+    {.}
+  to_plot_north <- to_plot %>%
+    dplyr::filter(!!rlang::sym(regioncol)=="North") %>%
+    {.}
+  to_plot_south <- to_plot %>%
+    dplyr::filter(!!rlang::sym(regioncol)=="South") %>%
+    {.}
   ## for paper
-  ## ggplot2::facet_wrap(`US Climate Region`~`model`, ncol=2) +
+  ## binsize = 4
+  ## jitterAmount = 0.3
   ## for slides
-  ## use nrow=2 for climate region plots
-  ggplot2::facet_wrap(as.formula(paste("model~", "status")), ncol=2) +
-  ## ggplot2::facet_wrap(`model`~`USRegion`, nrow=2) +
-  ggplot2::xlab("Temperature Bin") +
-  ggplot2::ylab("ln(Electricity in kBtu / gross sqft) * 1000") +
-  ggplot2::coord_cartesian(ylim=c(shifty, yupperlimit)) +
-  ## this is to plot slide_zoom for electric
-  ## ggplot2::ylim(c(-100, 100)) +
-  ## this is to plot slide_zoom for gas
-  ## ggplot2::ylim(c(-150, 150)) +
-  ggplot2::theme_bw() +
-  ggplot2::scale_color_manual(values = RColorBrewer::brewer.pal(3, "RdBu")[c(3, 1)], name="US Region") +
-  ggplot2::theme(axis.text.x = element_text(angle = 90, hjust = 1),
-                legend.title=element_blank(), legend.position = "bottom")
-  print(p)
-if (regioncol == "US Climate Region") {
-  ggplot2::ggsave(file=sprintf("~/Dropbox/thesis/code/pubPriCmp/image/bin_coef_ci_climate_slide_zoom%s.png", energy_type), width=8, height=5, units="in")
-## ggplot2::ggsave(file=sprintf("~/Dropbox/thesis/code/pubPriCmp/image/bin_coef_ci_climate_slide%s.png", energy_type), width=8, height=5, units="in")
-## for paper
-## ggplot2::ggsave(file="~/Dropbox/thesis/code/pubPriCmp/image/bin_coef_ci_climate.png", width=8, height=7, units="in")
-}
-else {
-  ## ggplot2::ggsave(file=sprintf("~/Dropbox/thesis/code/pubPriCmp/image/bin_coef_ci_%s_slide_zoom%s.png", regioncol, energy_type), width=8, height=5, units="in")
-  ggplot2::ggsave(file=sprintf("~/Dropbox/thesis/code/pubPriCmp/image/bin_coef_ci_%s_slide%s_%s.png", regioncol, energy_type, modelname), width=8, height=5, units="in")
+  binsize = 1.7
+  jitterAmount = 0.15
+  if (energy_type == "_total") {
+    binsize = 3.4
+    jitterAmount = 0.17
+  }
+  ## facet by portfolio
+  p <- to_plot %>%
+    ggplot2::ggplot() +
+    ggplot2::geom_point(ggplot2::aes(x=ordering, y=value, color=!!rlang::sym(regioncol)), size=0.7) +
+    ggplot2::geom_line(ggplot2::aes(x=ordering, y=value, linetype=variable, color=!!rlang::sym(regioncol))) +
+    scale_linetype_manual(values=c("dashed", "dashed", "solid"), breaks=c("ci_low", NA, "coef"), labels=c("95% C.I.", "", "Coefficient")) +
+    scale_x_continuous(breaks=1:length(breaklabels), labels=breaklabels) +
+    ggplot2::geom_segment(ggplot2::aes(x=`ordering`-jitterAmount, xend=`ordering`-jitterAmount, y=`count_start`, yend=`count_end`, group=!!rlang::sym(regioncol), color=!!rlang::sym(regioncol)), data=to_plot_north, size=binsize) +
+    ggplot2::geom_segment(ggplot2::aes(x=`ordering`+jitterAmount, xend=`ordering`+jitterAmount, y=`count_start`, yend=`count_end`, group=!!rlang::sym(regioncol), color=!!rlang::sym(regioncol)), data=to_plot_south, size=binsize) +
+    ## for paper
+    ## ggplot2::facet_wrap(`US Climate Region`~`model`, ncol=2) +
+    ## for slides
+    ## use nrow=2 for climate region plots
+    ggplot2::facet_wrap(as.formula(paste("model~", "status")), ncol=2) +
+    ## ggplot2::facet_wrap(`model`~`USRegion`, nrow=2) +
+    ggplot2::xlab("Temperature Bin") +
+    ggplot2::ylab("ln(Electricity in kBtu / gross sqft) * 1000") +
+    ## ggplot2::coord_cartesian(ylim=c(shifty, yupperlimit)) +
+    ## this is to plot slide_zoom for electric
+    ## ggplot2::ylim(c(-100, 100)) +
+    ## this is to plot slide_zoom for gas
+    ## ggplot2::ylim(c(-150, 150)) +
+    ggplot2::theme_bw() +
+    ggplot2::scale_color_manual(values = RColorBrewer::brewer.pal(3, "RdBu")[c(3, 1)], name="US Region") +
+    ggplot2::ggtitle(captions[i]) +
+    ggplot2::theme(axis.text.x = element_text(angle = 90, hjust = 1),
+                  legend.title=element_blank(), legend.position = "bottom")
+  if (regioncol == "US Climate Region") {
+    ## ggplot2::ggsave(file=sprintf("~/Dropbox/thesis/code/pubPriCmp/image/bin_coef_ci_climate_slide_zoom%s.png", energy_type), width=8, height=5, units="in")
+  ggplot2::ggsave(file=sprintf("~/Dropbox/thesis/code/pubPriCmp/image/bin_coef_ci_climate_slide%s.png", energy_type), width=8, height=5, units="in")
   ## for paper
-  ## ggplot2::ggsave(file="~/Dropbox/thesis/code/pubPriCmp/image/bin_coef_ci_usregion.png", width=8, height=7, units="in")
+  ## ggplot2::ggsave(file="~/Dropbox/thesis/code/pubPriCmp/image/bin_coef_ci_climate.png", width=8, height=7, units="in")
+  }
+  else {
+    ## ggplot2::ggsave(file=sprintf("~/Dropbox/thesis/code/pubPriCmp/image/bin_coef_ci_%s_slide_zoom%s.png", regioncol, energy_type), width=8, height=5, units="in")
+    ggplot2::ggsave(file=sprintf("~/Dropbox/thesis/code/pubPriCmp/image/bin_coef_ci_%s_slide%s_%s%s.png", regioncol, energy_type, modelname, s), width=8, height=6, units="in")
+    ## for paper
+    ## ggplot2::ggsave(file="~/Dropbox/thesis/code/pubPriCmp/image/bin_coef_ci_usregion.png", width=8, height=7, units="in")
+  }
+  ## facet by region
+  p <- to_plot %>%
+    ggplot2::ggplot() +
+    ggplot2::geom_point(ggplot2::aes(x=ordering, y=value, color=status), size=0.7) +
+    ggplot2::geom_line(ggplot2::aes(x=ordering, y=value, linetype=variable, color=status)) +
+    scale_linetype_manual(values=c("dashed", "dashed", "solid"), breaks=c("ci_low", NA, "coef"), labels=c("95% C.I.", "", "Coefficient")) +
+    scale_x_continuous(breaks=1:length(breaklabels), labels=breaklabels) +
+    ggplot2::geom_segment(ggplot2::aes(x=`ordering`-jitterAmount, xend=`ordering`-jitterAmount, y=`count_start`, yend=`count_end`, group=!!rlang::sym("status"), color=!!rlang::sym("status")), data=to_plot_public, size=binsize) +
+    ggplot2::geom_segment(ggplot2::aes(x=`ordering`+jitterAmount, xend=`ordering`+jitterAmount, y=`count_start`, yend=`count_end`, group=!!rlang::sym("status"), color=!!rlang::sym("status")), data=to_plot_private, size=binsize) +
+    ## for paper
+    ## ggplot2::facet_wrap(`US Climate Region`~`model`, ncol=2) +
+    ## for slides
+    ## use nrow=2 for climate region plots
+    ggplot2::facet_wrap(as.formula(paste("model~", regioncol)), ncol=2) +
+    ## ggplot2::facet_wrap(`model`~`USRegion`, nrow=2) +
+    ggplot2::xlab("Temperature Bin") +
+    ggplot2::ylab("ln(Electricity in kBtu / gross sqft) * 1000") +
+    ## ggplot2::coord_cartesian(ylim=c(shifty, yupperlimit)) +
+    ## this is to plot slide_zoom for electric
+    ## ggplot2::ylim(c(-100, 100)) +
+    ## this is to plot slide_zoom for gas
+    ## ggplot2::ylim(c(-150, 150)) +
+    ggplot2::ggtitle(captions[i]) +
+    ggplot2::theme_bw() +
+    ggplot2::scale_color_grey() +
+    ggplot2::theme(axis.text.x = element_text(angle = 90, hjust = 1),
+                  legend.title=element_blank(), legend.position = "bottom")
+    print(p)
+  if (regioncol == "US Climate Region") {
+    ggplot2::ggsave(file=sprintf("~/Dropbox/thesis/code/pubPriCmp/image/bin_coef_ci_climate_slide_zoom%s_facetRegion.png", energy_type), width=8, height=5, units="in")
+  ## ggplot2::ggsave(file=sprintf("~/Dropbox/thesis/code/pubPriCmp/image/bin_coef_ci_climate_slide%s_facetRegion.png", energy_type), width=8, height=5, units="in")
+  ## for paper
+  ## ggplot2::ggsave(file="~/Dropbox/thesis/code/pubPriCmp/image/bin_coef_ci_climate_facetRegion.png", width=8, height=7, units="in")
+  }
+  else {
+    ## ggplot2::ggsave(file=sprintf("~/Dropbox/thesis/code/pubPriCmp/image/bin_coef_ci_%s_slide_zoom%s_facetRegion.png", regioncol, energy_type), width=8, height=5, units="in")
+    ggplot2::ggsave(file=sprintf("~/Dropbox/thesis/code/pubPriCmp/image/bin_coef_ci_%s_slide%s_%s_facetRegion%s.png", regioncol, energy_type, modelname, s), width=8, height=5, units="in")
+    ## for paper
+    ## ggplot2::ggsave(file="~/Dropbox/thesis/code/pubPriCmp/image/bin_coef_ci_usregion_facetRegion.png", width=8, height=7, units="in")
+  }
 }
 
-## facet by region
-p <- to_plot %>%
-  ggplot2::ggplot() +
-  ggplot2::geom_point(ggplot2::aes(x=ordering, y=value, color=status), size=0.7) +
-  ggplot2::geom_line(ggplot2::aes(x=ordering, y=value, linetype=variable, color=status)) +
-  scale_linetype_manual(values=c("dashed", "dashed", "solid"), breaks=c("ci_low", NA, "coef"), labels=c("95% C.I.", "", "Coefficient")) +
-  scale_x_continuous(breaks=1:length(breaklabels), labels=breaklabels) +
-  ggplot2::geom_segment(ggplot2::aes(x=`ordering`-jitterAmount, xend=`ordering`-jitterAmount, y=`count_start`, yend=`count_end`, group=!!rlang::sym("status"), color=!!rlang::sym("status")), data=to_plot_public, size=binsize) +
-  ggplot2::geom_segment(ggplot2::aes(x=`ordering`+jitterAmount, xend=`ordering`+jitterAmount, y=`count_start`, yend=`count_end`, group=!!rlang::sym("status"), color=!!rlang::sym("status")), data=to_plot_private, size=binsize) +
-  ## for paper
-  ## ggplot2::facet_wrap(`US Climate Region`~`model`, ncol=2) +
-  ## for slides
-  ## use nrow=2 for climate region plots
-  ggplot2::facet_wrap(as.formula(paste("model~", regioncol)), ncol=2) +
-  ## ggplot2::facet_wrap(`model`~`USRegion`, nrow=2) +
-  ggplot2::xlab("Temperature Bin") +
-  ggplot2::ylab("ln(Electricity in kBtu / gross sqft) * 1000") +
-  ggplot2::coord_cartesian(ylim=c(shifty, yupperlimit)) +
-  ## this is to plot slide_zoom for electric
-  ## ggplot2::ylim(c(-100, 100)) +
-  ## this is to plot slide_zoom for gas
-  ## ggplot2::ylim(c(-150, 150)) +
-  ggplot2::theme_bw() +
-  ggplot2::scale_color_grey() +
-  ggplot2::theme(axis.text.x = element_text(angle = 90, hjust = 1),
-                legend.title=element_blank(), legend.position = "bottom")
-  print(p)
-if (regioncol == "US Climate Region") {
-  ggplot2::ggsave(file=sprintf("~/Dropbox/thesis/code/pubPriCmp/image/bin_coef_ci_climate_slide_zoom%s_facetRegion.png", energy_type), width=8, height=5, units="in")
-## ggplot2::ggsave(file=sprintf("~/Dropbox/thesis/code/pubPriCmp/image/bin_coef_ci_climate_slide%s_facetRegion.png", energy_type), width=8, height=5, units="in")
-## for paper
-## ggplot2::ggsave(file="~/Dropbox/thesis/code/pubPriCmp/image/bin_coef_ci_climate_facetRegion.png", width=8, height=7, units="in")
+## generate image tex file
+newlines = NULL
+## imagePrefix = "bin_coef_ci_region_wiki_slide_total_both_facetRegion"
+## filename = "facetRegionPlots"
+## imagePrefix = "bin_coef_ci_region_wiki_slide_total_both"
+## filename = "facetPortfolioPlots"
+## imagePrefix = "facet_pubpri_bin_coef_ci_greeness_separate_organization_baseline_slide_total"
+## filename = "facetGreenessPlots_baseline_majority"
+## imagePrefix = "facet_pubpri_bin_coef_ci_greeness_howestate_separate_organization_baseline_slide_total"
+## filename = "facetGreenessPlots_baseline_howestate"
+## imagePrefix = "facet_pubpri_bin_coef_ci_greeness_howecounty_separate_organization_baseline_slide_total"
+## filename = "facetGreenessPlots_baseline_howecounty"
+## imagePrefix = "facet_pubpri_bin_coef_ci_greeness_separate_organization_statetrend_slide_total"
+## filename = "facetGreenessPlots_statetrend_majority"
+## imagePrefix = "facet_pubpri_bin_coef_ci_greeness_howestate_separate_organization_statetrend_slide_total"
+## filename = "facetGreenessPlots_statetrend_howestate"
+## imagePrefix = "facet_pubpri_bin_coef_ci_greeness_howecounty_separate_organization_statetrend_slide_total"
+## filename = "facetGreenessPlots_statetrend_howecounty"
+## imagePrefix = "bin_coef_ci_separate_organization_baseline_slide_total"
+## filename = "main_analysis_baseline_total"
+imagePrefix = "bin_coef_ci_separate_organization_baseline_slide_gas"
+filename = "main_analysis_baseline_gas"
+## imagePrefix = "bin_coef_ci_separate_organization_baseline_slide"
+## filename = "main_analysis_baseline"
+for (s in folder.suffixes) {
+  newlines <- c(newlines,
+                "\\begin{frame}",
+                "\\begin{figure}[h!]",
+                "\\centering",
+                sprintf("\\includegraphics[width=1.0\\linewidth]{images/%s%s.png}",
+                        imagePrefix, s),
+                "\\end{figure}",
+                "\\end{frame}")
 }
-else {
-  ## ggplot2::ggsave(file=sprintf("~/Dropbox/thesis/code/pubPriCmp/image/bin_coef_ci_%s_slide_zoom%s_facetRegion.png", regioncol, energy_type), width=8, height=5, units="in")
-  ggplot2::ggsave(file=sprintf("~/Dropbox/thesis/code/pubPriCmp/image/bin_coef_ci_%s_slide%s_%s_facetRegion.png", regioncol, energy_type, modelname), width=8, height=5, units="in")
-  ## for paper
-  ## ggplot2::ggsave(file="~/Dropbox/thesis/code/pubPriCmp/image/bin_coef_ci_usregion_facetRegion.png", width=8, height=7, units="in")
+con <- file(sprintf("~/Dropbox/thesis/writeups/policy_cmp/images/%s.tex", filename), open = "w+")
+writeLines(newlines, con, sep = "\n", useBytes = FALSE)
+close(con)
+
+## generate tex order by building type first then by greenness source
+for (modeltype in c("baseline", "statetrend")) {
+  newlines = NULL
+  filename = sprintf("facetGreenessPlots_%s", modeltype)
+  for (s in folder.suffixes) {
+    for (green.suffix in c("", "_howestate", "_howecounty")) {
+      imagePrefix = sprintf("facet_pubpri_bin_coef_ci_greeness%s_separate_organization_%s_slide_total",
+                            green.suffix, modeltype)
+      newlines <- c(newlines,
+                    "\\begin{frame}",
+                    "\\begin{figure}[h!]",
+                    "\\centering",
+                    sprintf("\\includegraphics[width=1.0\\linewidth]{images/%s%s.png}",
+                            imagePrefix, s),
+                    "\\end{figure}",
+                    "\\end{frame}")
+    }
+    con <- file(sprintf("~/Dropbox/thesis/writeups/policy_cmp/images/%s.tex", filename), open = "w+")
+    writeLines(newlines, con, sep = "\n", useBytes = FALSE)
+    close(con)
+  }
 }
 
 ## generate regression result summary table for bin model with greeness
@@ -2065,45 +2468,271 @@ for (fileSuffix in names(retrofits)) {
   ggplot2::ggsave(file=sprintf("~/Dropbox/thesis/code/pubPriCmp/image/%s_%sretrofit_no_climate_coef_ci_%s_%s%s.png", duration, additive_keywords, fileSuffix, length(models), energy_type), width=8, height=5, units="in")
 }
 
-## slide summary stats
-df1 = allDataGreen %>%
-  dplyr::mutate(`<40`=`<10` + `[10-20)` + `[20-30)` + `[30-40)`,
-                `>80`=`[80-90)` + `>90`) %>%
-  dplyr::select(`eui_elec`, `eui_gas`, `<40`, `>80`, `private`, `Name`) %>%
-  dplyr::group_by(`private`) %>%
-  dplyr::summarise(`eui_elec`=mean(`eui_elec`), `eui_gas`=mean(`eui_gas`), `<40`=mean(`<40`), `>80`=mean(`>80`), `building count`=n_distinct(Name)) %>%
+## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+## start section: create summary of energy, weather, and building count for 4 alternative study set, based on different building types
+## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+
+get.study.set <- function(own.or.lease, office.class) {
+  if (!is.na(office.class)) {
+    if (office.class == "o_o") {
+      generic.office.pnc = "Office"
+      generic.office.gsa = "Office"
+    } else if (office.class == "o_oct") {
+      generic.office.pnc = "Office"
+      generic.office.gsa = c("Courthouse", "Office", "CT/Office")
+    } else if (office.class == "r_o") {
+      generic.office.pnc = "Retail"
+      generic.office.gsa = "Office"
+    } else if (office.class == "ro_oct") {
+      generic.office.pnc = c("Retail", "Office")
+      generic.office.gsa = c("Courthouse", "Office", "CT/Office")
+    }
+    to.summarize = allDataGreen %>%
+      dplyr::filter((Organization == "PNC" & `type_general` %in% generic.office.pnc) | (Organization == "GSA" & `type_general` %in% generic.office.gsa)) %>%
+      {.}
+  } else {
+    to.summarize = allDataGreen
+    generic.office.gsa = NA
+    generic.office.pnc = NA
+  }
+  if (!is.na(own.or.lease)) {
+    to.summarize <- to.summarize %>%
+      dplyr::filter(`Ownership`==own.or.lease) %>%
+      {.}
+  }
+  return(list(df=to.summarize, generic.office.gsa=generic.office.gsa, generic.office.pnc=generic.office.pnc))
+}
+
+## following is how to use the above function
+## restrict to owned public offices, courthouse, private offices
+## temp <- get.study.set("Owned", "o_oct")
+## restrict to owned and leased public offices, courthouse, private offices
+## temp <- get.study.set(NA, "o_oct")
+## No restrictions
+## temp <- get.study.set(NA, NA)
+temp$df
+
+## following check on what is returned by the above function
+temp %>%
+  distinct(Name, `type_general`, Organization) %>%
+  dplyr::group_by(Organization, `type_general`) %>%
+  dplyr::summarise(n()) %>%
+  print()
+
+
+folder.suffixes = c("",
+                    "_o_o_owned", "_o_oct_owned", "_r_o_owned", "_ro_oct_owned",
+                    "_o_o_owned_and_leased", "_o_oct_owned_and_leased", "_r_o_owned_and_leased", "_ro_oct_owned_and_leased"
+                    )
+
+captions = c("no restrictions",
+             "Public: owned offices; Private: owned offices",
+             "Public: owned offices, courthouses, CT/Offices; Private: owned offices",
+             "Public: owned offices; Private: owned retails",
+             "Public: owned offices, courthouses, CT/Offices; Private: owned offices, retails",
+             "Public: offices; Private: offices",
+             "Public: offices, courthouses, CT/Offices; Private: offices",
+             "Public: offices; Private: retails",
+             "Public: offices, courthouses, CT/Offices; Private: offices, retails")
+
+## change the major source of greeness to howe by county
+data.to.summarize = allDataGreen %>%
+  dplyr::mutate(Greeness = greeness.howe.county) %>%
   {.}
 
-df2 = allDataGreen %>%
-  dplyr::mutate(`<40`=`<10` + `[10-20)` + `[20-30)` + `[30-40)`,
-                `>80`=`[80-90)` + `>90`) %>%
-  dplyr::select(`eui_elec`, `eui_gas`, `<40`, `>80`, `private`, `region_wiki`, `Name`) %>%
-  dplyr::group_by(`private`, `region_wiki`) %>%
-  dplyr::summarise(`eui_elec`=mean(`eui_elec`), `eui_gas`=mean(`eui_gas`), `<40`=mean(`<40`), `>80`=mean(`>80`), `building count`=n_distinct(Name)) %>%
-  {.}
-
-df3 = allDataGreen %>%
-  dplyr::mutate(`<40`=`<10` + `[10-20)` + `[20-30)` + `[30-40)`,
-                `>80`=`[80-90)` + `>90`) %>%
-  dplyr::select(`eui_elec`, `eui_gas`, `<40`, `>80`, `private`, `Greeness`, `Name`) %>%
-  dplyr::group_by(`private`, `Greeness`) %>%
-  dplyr::summarise(`eui_elec`=mean(`eui_elec`), `eui_gas`=mean(`eui_gas`), `<40`=mean(`<40`), `>80`=mean(`>80`), `building count`=n_distinct(Name)) %>%
-  {.}
-
-df1 %>%
-  dplyr::bind_rows(df2, df3) %>%
-  readr::write_csv("slide_summary_eui_weather_cnt.csv")
+for (i in seq_along(folder.suffixes)) {
+  s = folder.suffixes[i]
+  print(s)
+  tokens = unlist(strsplit(s, "_"))
+  if (length(tokens) == 0) {
+    ownlease = NA
+    usetype = NA
+  } else {
+    usetype = paste0(tokens[2:3], collapse = "_")
+    if ("leased" %in% tokens) {
+      ownlease = NA
+    } else {
+      ownlease = "Owned"
+    }
+  }
+  if (is.na(ownlease)) {
+    own.or.lease.str = ""
+  } else {
+    own.or.lease.str = ownlease
+  }
+  result <- get.study.set(ownlease, usetype)
+  to.summarize = result$df
+  generic.office.gsa = result$generic.office.gsa
+  generic.office.pnc = result$generic.office.pnc
+  ## may not be the properway to check whether the vector is NA
+  if (is.na(generic.office.gsa[1])) {
+    generic.office.gsa = "no restriction"
+  }
+  if (is.na(generic.office.pnc[1])) {
+    generic.office.pnc = "no restriction"
+  }
+  to.summarize %>%
+    distinct(Name, `type_general`, Organization) %>%
+    dplyr::group_by(Organization, `type_general`) %>%
+    dplyr::summarise(n()) %>%
+    print()
+  df.n = to.summarize %>%
+    dplyr::distinct(Organization, Name) %>%
+    dplyr::group_by(Organization) %>%
+    dplyr::summarise(cnt=n()) %>%
+    dplyr::ungroup() %>%
+    tibble::column_to_rownames("Organization") %>%
+    {.}
+  ## slide summary stats
+  df1 = to.summarize %>%
+    dplyr::mutate(`<40`=`<10` + `[10-20)` + `[20-30)` + `[30-40)`,
+                  `>80`=`[80-90)` + `>90`) %>%
+    dplyr::select(`eui_elec`, `eui_gas`, `<40`, `>80`, `private`, `Name`) %>%
+    dplyr::group_by(`private`) %>%
+    dplyr::summarise(`eui_elec`=mean(`eui_elec`), `eui_gas`=mean(`eui_gas`), `<40`=mean(`<40`), `>80`=mean(`>80`), `building count`=n_distinct(Name)) %>%
+    dplyr::ungroup() %>%
+    {.}
+  df2 = to.summarize %>%
+    dplyr::mutate(`<40`=`<10` + `[10-20)` + `[20-30)` + `[30-40)`,
+                  `>80`=`[80-90)` + `>90`) %>%
+    dplyr::select(`eui_elec`, `eui_gas`, `<40`, `>80`, `private`, `region_wiki`, `Name`) %>%
+    dplyr::group_by(`private`, `region_wiki`) %>%
+    dplyr::summarise(`eui_elec`=mean(`eui_elec`), `eui_gas`=mean(`eui_gas`), `<40`=mean(`<40`), `>80`=mean(`>80`), `building count`=n_distinct(Name)) %>%
+    dplyr::ungroup() %>%
+    {.}
+  df3 = to.summarize %>%
+    dplyr::mutate(`<40`=`<10` + `[10-20)` + `[20-30)` + `[30-40)`,
+                  `>80`=`[80-90)` + `>90`) %>%
+    dplyr::select(`eui_elec`, `eui_gas`, `<40`, `>80`, `private`, `Greeness`, `Name`) %>%
+    dplyr::group_by(`private`, `Greeness`) %>%
+    dplyr::summarise(`eui_elec`=mean(`eui_elec`), `eui_gas`=mean(`eui_gas`), `<40`=mean(`<40`), `>80`=mean(`>80`), `building count`=n_distinct(Name)) %>%
+    dplyr::ungroup() %>%
+    {.}
+  sink(sprintf("~/Dropbox/thesis/writeups/policy_cmp/tables/energy_weather_n_by_region_green%s.tex",
+               s))
+  df1 %>%
+    dplyr::bind_rows(df2, df3) %>%
+    dplyr::select(private, `region_wiki`, Greeness, everything()) %>%
+    dplyr::mutate(order = c(1, 6, 2, 3, 7, 8, 4, 5, 9, 10)) %>%
+    dplyr::arrange(order) %>%
+    ## dplyr::mutate(private = c("public", rep("", 5), "private", rep("", 5))) %>%
+    dplyr::mutate(private=ifelse(private == 1, "private", "public")) %>%
+    dplyr::mutate(` `=ifelse(is.na(`region_wiki`), ifelse(is.na(`Greeness`), private, `Greeness`), `region_wiki`)) %>%
+    dplyr::select(-`region_wiki`, -`Greeness`, -private, -order) %>%
+    dplyr::select(` `, everything()) %>%
+    dplyr::rename(`Electricity`=`eui_elec`, `Gas`=`eui_gas`) %>%
+    knitr::kable("latex", booktabs = T, format.args=list(big.mark=",", digits=3),
+                 caption=sprintf("%s PNC (n=%s): %s; GSA (n=%s): %s",
+                                 own.or.lease.str,
+                                 df.n["PNC",1],
+                                 paste(generic.office.pnc, collapse = ", "),
+                                 df.n["GSA",1],
+                                 paste(generic.office.gsa, collapse = ", "))) %>%
+    kableExtra::kable_styling(full_width = FALSE, font_size = 7) %>%
+    kableExtra::group_rows("US region", 2, 3, bold=FALSE) %>%
+    kableExtra::group_rows("Greeness", 4, 5, bold=FALSE) %>%
+    kableExtra::group_rows("US region", 7, 8, bold=FALSE) %>%
+    kableExtra::group_rows("Greeness", 9, 10, bold=FALSE) %>%
+    kableExtra::column_spec(2:6, width = "1cm") %>%
+    ## kableExtra::kable_styling(latex_options = "striped") %>%
+    kableExtra::add_header_above(c(" "=1, "Monthly consumption\n(kBtu/sqft)" = 2, "# of days in a month \nwith mean temperature" = 2, "n" = 1), escape = TRUE) %>%
+    print()
+  sink()
+}
 
 allDataGreen %>%
   dplyr::distinct(`Name`, `Organization`, `region_wiki`) %>%
   dplyr::group_by(`Organization`, `region_wiki`) %>%
   dplyr::summarise(n())
 
-## comparing static characteristics of the two portfolio
+## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+## end section: create summary of energy, weather, and building count for 4 alternative study set, based on different building types
+## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+
+## comparing static characteristics / balance of covariates of the two portfolio
+
 load("../data/allDataGreen.rda")
 
-allDataGreen %>%
-  names()
+balance.check.vars = c("GSF", "Sum of Employees", "Electric_(kBtu)",
+                       "Gas_(kBtu)","eui_elec", "eui_gas", "eui_total", "HDD",
+                       "CDD", "<10", "[20-30)", "[30-40)", "[40-50)" ,
+                       "[50-60)", "[60-70)" , "[70-80)", "[80-90)" , ">90")
+
+for (i in seq_along(folder.suffixes)) {
+  s = folder.suffixes[i]
+  print(s)
+  tokens = unlist(strsplit(s, "_"))
+  if (length(tokens) == 0) {
+    ownlease = NA
+    usetype = NA
+  } else {
+    usetype = paste0(tokens[2:3], collapse = "_")
+    if ("leased" %in% tokens) {
+      ownlease = NA
+    } else {
+      ownlease = "Owned"
+    }
+  }
+  if (is.na(ownlease)) {
+    own.or.lease.str = ""
+  } else {
+    own.or.lease.str = ownlease
+  }
+  result <- get.study.set(ownlease, usetype)
+  studyset = result$df
+  generic.office.gsa = result$generic.office.gsa
+  generic.office.pnc = result$generic.office.pnc
+  ## may not be the properway to check whether the vector is NA
+  if (is.na(generic.office.gsa[1])) {
+    generic.office.gsa = "no restriction"
+  }
+  if (is.na(generic.office.pnc[1])) {
+    generic.office.pnc = "no restriction"
+  }
+  studyset %>%
+    distinct(Name, `type_general`, Organization) %>%
+    dplyr::group_by(Organization, `type_general`) %>%
+    dplyr::summarise(n()) %>%
+    print()
+  df.n = studyset %>%
+    dplyr::distinct(Organization, Name) %>%
+    dplyr::group_by(Organization) %>%
+    dplyr::summarise(cnt=n()) %>%
+    dplyr::ungroup() %>%
+    tibble::column_to_rownames("Organization") %>%
+    {.}
+  acc.balance = NULL
+  for (v in balance.check.vars) {
+    tresult <- t.test(as.formula(sprintf("`%s` ~ private", v)), data = studyset, alternative = "two.sided")
+    mu0 <- tresult$estimate[[1]]
+    mu1 <- tresult$estimate[[2]]
+    dif <- mu1 - mu0
+    p <- tresult$p.value
+    p.with.sig <- ifelse(p < 0.05, ifelse(p >= 0.01, sprintf("%.2f*", p), sprintf("%.2f**", p)), sprintf("%.2f", p))
+    print(p)
+    print(p.with.sig)
+    acc.balance <- rbind(acc.balance,
+                        data.frame(variable = v, mu0 = mu0, mu1 = mu1, dif = dif, p = p, p.with.sig = p.with.sig))
+  }
+  sink(sprintf("~/Dropbox/thesis/writeups/policy_cmp/tables/balance_compare%s.tex", s))
+  acc.balance %>%
+    dplyr::select(-p) %>%
+    knitr::kable("latex", booktabs = T,
+                format.args=list(big.mark=",", digits=2, scientific=F),
+                caption=sprintf("%s PNC (n=%s): %s; GSA (n=%s): %s",
+                                own.or.lease.str,
+                                df.n["PNC",1],
+                                paste(generic.office.pnc, collapse = ", "),
+                                df.n["GSA",1],
+                                paste(generic.office.gsa, collapse = ", "))) %>%
+    kableExtra::kable_styling(full_width = FALSE, font_size = 7) %>%
+    kableExtra::group_rows("Static feature", 1, 2, bold=FALSE) %>%
+    kableExtra::group_rows("Energy", 3, 7, bold=FALSE) %>%
+    kableExtra::group_rows("Weather", 8, 18, bold=FALSE) %>%
+    ## kableExtra::column_spec(2:6, width = "1cm") %>%
+    print()
+  sink()
+}
 
 dfstatic = allDataGreen %>%
   dplyr::select(-`latitude`, -`longitude`, -`City`, -`State`, -`year`, -`Organization`, -`Date`) %>%

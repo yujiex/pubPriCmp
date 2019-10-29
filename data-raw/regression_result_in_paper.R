@@ -733,3 +733,167 @@ result_table_tex <- xtable(df, caption=sprintf("Regression result: retrofit DD m
 print(result_table_tex, tabular.environment = "tabular", include.rownames=FALSE,
       file=sprintf("~/Dropbox/thesis/writeups/policy_cmp/tables/additive_model_result%s.tex", energy_type),
       size="\\footnotesize")
+
+## ----------------------------------------------------------------------------------------
+## process output from tex_tables.tex from stata output
+## ----------------------------------------------------------------------------------------
+setwd("~/Dropbox/thesis/writeups/policy_cmp/tables")
+
+folder.suffixes = c("",
+                    "_o_o_owned", "_o_oct_owned", "_r_o_owned", "_ro_oct_owned",
+                    "_o_o_owned_and_leased", "_o_oct_owned_and_leased", "_r_o_owned_and_leased", "_ro_oct_owned_and_leased"
+                    )
+
+captions = c("no restrictions",
+              "Public: owned offices; Private: owned offices",
+              "Public: owned offices, courthouses, CT/Offices; Private: owned offices",
+              "Public: owned offices; Private: owned retails",
+              "Public: owned offices, courthouses, CT/Offices; Private: owned offices, retails",
+              "Public: offices; Private: offices",
+              "Public: offices, courthouses, CT/Offices; Private: offices",
+              "Public: offices; Private: retails",
+              "Public: offices, courthouses, CT/Offices; Private: offices, retails")
+
+## process main results
+for (i in seq_along(folder.suffixes)) {
+  s = folder.suffixes[i]
+  print(s)
+  inputFile <- sprintf("reg_result%s/regression_portfolio_total.tex", s)
+  outputFile <- sprintf("reg_result%s/regression_portolio_total_postprocess.tex", s)
+  con  <- file(inputFile, open = "r")
+  lines <- readLines(con, warn = FALSE)
+  close(con)
+  ntotal = length(lines)
+  newlines <- c("\\begin{frame}",
+                "\\centering",
+                "\\scriptsize",
+                "\\begin{table}",
+                lines[4:5],
+                lines[8:24], "private & N & N & Y & Y \\\\",
+                "state trend & N & Y & N & Y \\\\",
+                lines[(ntotal - 5):(ntotal - 1)],
+                sprintf("\\caption{%s}", captions[i]),
+                "\\end{table}",
+                "\\end{frame}")
+  con <- file(outputFile, open = "w+")
+  writeLines(newlines, con, sep = "\n", useBytes = FALSE)
+  close(con)
+}
+
+
+## for (modeltype in c("baseline", "statetrend")) {
+##   for (i in seq_along(folder.suffixes)[2:9]) {
+##     s = folder.suffixes[i]
+##     print(s)
+##     inputFile <- sprintf("reg_result%s/regression_region_wiki_%s_total.tex", s, modeltype)
+##     inputtxt <- sprintf("reg_result%s/regression_region_wiki_%s_total.txt", s, modeltype)
+##     outputFile <- sprintf("reg_result%s/regression_region_wiki_%s_total_postprocess.tex", s, modeltype)
+##     file.remove(inputFile)
+##     file.remove(inputtxt)
+##     file.remove(outputFile)
+##   }
+## }
+
+## process us region results
+for (modeltype in c("baseline", "statetrend")) {
+  for (i in seq_along(folder.suffixes)) {
+    s = folder.suffixes[i]
+    print(s)
+    inputFile <- sprintf("reg_result%s/regression_region_wiki_%s_total.tex", s, modeltype)
+    outputFile <- sprintf("reg_result%s/regression_region_wiki_%s_total_postprocess.tex", s, modeltype)
+    con  <- file(inputFile, open = "r")
+    lines <- readLines(con, warn = FALSE)
+    close(con)
+    ntotal = length(lines)
+    newlines <- c("\\begin{frame}",
+                  "\\centering",
+                  "\\scriptsize",
+                  "\\begin{table}",
+                  lines[4:5],
+                  lines[8:25],
+                  "portfolio & public & public & private & private  \\\\",
+                  "US region & North & South & North & South \\\\",
+                  lines[(ntotal - 5):(ntotal - 1)],
+                  sprintf("\\caption{%s}", captions[i]),
+                  "\\end{table}",
+                  "\\end{frame}")
+    con <- file(outputFile, open = "w+")
+    writeLines(newlines, con, sep = "\n", useBytes = FALSE)
+    close(con)
+  }
+}
+
+setwd("~/Dropbox/thesis/writeups/policy_cmp/tables")
+
+green = c("", "_howestate", "_howecounty")
+sourcename = c("Majority Vote", "State Data from Howe 2015", "County Data from Howe 2015")
+
+## process greenness results
+for (modeltype in c("baseline", "statetrend")) {
+  for (j in seq_along(green)) {
+    green.suffix = green[j]
+    for (i in seq_along(folder.suffixes)) {
+      s = folder.suffixes[i]
+      print(s)
+      inputFile <- sprintf("reg_result%s/regression_greeness_%s_total%s.tex", s, modeltype, green.suffix)
+      outputFile <- sprintf("reg_result%s/regression_greeness_%s_total_postprocess%s.tex", s, modeltype, green.suffix)
+      con  <- file(inputFile, open = "r")
+      lines <- readLines(con, warn = FALSE)
+      close(con)
+      ntotal = length(lines)
+      newlines <- c("\\begin{frame}",
+                    "\\centering",
+                    "\\scriptsize",
+                    "\\begin{table}",
+                    lines[4:5],
+                    lines[8:25],
+                    "portfolio & public & public & private & private  \\\\",
+                    "Greenness & Least & Most & Least & Most \\\\",
+                    lines[(ntotal - 5):(ntotal - 1)],
+                    sprintf("\\caption{%s, greenness source: %s, model: %s}", captions[i], sourcename[j], modeltype),
+                    "\\end{table}",
+                    "\\end{frame}")
+      con <- file(outputFile, open = "w+")
+      writeLines(newlines, con, sep = "\n", useBytes = FALSE)
+      close(con)
+    }
+  }
+}
+
+## process input file the list of tex tables for greenness result
+newlines = NULL
+for (i in seq_along(folder.suffixes)) {
+  for (modeltype in c("baseline", "statetrend")) {
+    for (j in seq_along(green)) {
+      green.suffix = green[j]
+      s = folder.suffixes[i]
+      newlines = c(newlines,
+                   sprintf("\\input{tables/reg_result%s/regression_greeness_%s_total_postprocess%s}",
+              s, modeltype, green.suffix))
+    }
+  }
+}
+con <- file("../greeness_tables.tex", open = "w+")
+writeLines(newlines, con, sep = "\n", useBytes = FALSE)
+close(con)
+
+## outputname = "mean_summary_tables"
+## tableprefix = "energy_weather_n_by_region_green"
+outputname = "tstat_summary_tables"
+tableprefix = "balance_compare"
+setwd("~/Dropbox/thesis/writeups/policy_cmp/tables")
+## process input file of the list of tex summary tables
+newlines = NULL
+for (i in seq_along(folder.suffixes)) {
+    s = folder.suffixes[i]
+    newlines = c(newlines,
+                 "\\begin{frame}",
+                "\\centering",
+                "\\scriptsize",
+                sprintf("\\input{tables/%s%s}", tableprefix, s),
+                "\\end{frame}")
+}
+con <- file(sprintf("../%s.tex", outputname), open = "w+")
+writeLines(newlines, con, sep = "\n", useBytes = FALSE)
+close(con)
+
